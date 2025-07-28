@@ -244,8 +244,21 @@ class ChatBIGradioApp:
                 data_display = "\n".join(data_parts)
                 
                 # 准备图表数据
+                chart_data = None
                 if auto_viz and result.chart_info and result.chart_info.get('success'):
+                    print(f"[DEBUG] 图表信息: {result.chart_info}")
                     chart_data = self._create_plotly_chart(df, result.chart_info)
+                    print(f"[DEBUG] 图表创建结果: {chart_data is not None}")
+                elif auto_viz and metadata.get('visualization_suggestion'):
+                    # 如果chart_info不可用，尝试使用visualization_suggestion
+                    print(f"[DEBUG] 使用可视化建议: {metadata['visualization_suggestion']}")
+                    chart_data = self._create_chart_from_suggestion(df, metadata['visualization_suggestion'])
+                    print(f"[DEBUG] 从建议创建图表结果: {chart_data is not None}")
+                elif auto_viz and len(df.columns) >= 2:
+                    # 如果没有建议，尝试创建默认图表
+                    print(f"[DEBUG] 创建默认图表")
+                    chart_data = self._create_default_chart(df)
+                    print(f"[DEBUG] 默认图表创建结果: {chart_data is not None}")
             else:
                 data_display = "### ⚠️ 无数据\n查询执行成功但未返回数据"
             
@@ -298,10 +311,18 @@ class ChatBIGradioApp:
         try:
             chart_type = chart_info.get('chart_type', 'bar')
             title = chart_info.get('title', '数据可视化')
-            x_col = chart_info.get('x_column')
-            y_col = chart_info.get('y_column')
+            x_col = chart_info.get('x_column') or chart_info.get('x_axis')
+            y_col = chart_info.get('y_column') or chart_info.get('y_axis')
+            
+            print(f"[DEBUG] 图表参数: type={chart_type}, x={x_col}, y={y_col}, 可用列={list(df.columns)}")
             
             if not x_col or not y_col or x_col not in df.columns or y_col not in df.columns:
+                # 尝试自动选择合适的列
+                x_col, y_col = self._auto_select_columns(df)
+                print(f"[DEBUG] 自动选择列: x={x_col}, y={y_col}")
+            
+            if not x_col or not y_col:
+                print("[DEBUG] 无法确定绘图列")
                 return None
             
             # 根据图表类型创建图表
@@ -325,6 +346,81 @@ class ChatBIGradioApp:
             
         except Exception as e:
             print(f"图表创建失败: {e}")
+            import traceback
+            print(traceback.format_exc())
+            return None
+    
+    def _auto_select_columns(self, df: pd.DataFrame) -> tuple[str, str]:
+        """自动选择合适的列进行绘图"""
+        try:
+            columns = df.columns.tolist()
+            
+            # 查找数值列
+            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            # 查找非数值列（可能用作类别）
+            categorical_cols = df.select_dtypes(exclude=['number']).columns.tolist()
+            
+            # 如果有数值列，选择第一个作为y轴
+            y_col = numeric_cols[0] if numeric_cols else None
+            
+            # 选择x轴：优先选择非数值列，否则选择第一列
+            if categorical_cols:
+                x_col = categorical_cols[0]
+            elif len(columns) > 1:
+                x_col = columns[0] if columns[0] != y_col else columns[1]
+            else:
+                x_col = columns[0] if columns else None
+            
+            return x_col, y_col
+            
+        except Exception as e:
+            print(f"自动选择列失败: {e}")
+            return None, None
+    
+    def _create_chart_from_suggestion(self, df: pd.DataFrame, suggestion: Dict) -> Optional[go.Figure]:
+        """根据可视化建议创建图表"""
+        try:
+            chart_type = suggestion.get('chart_type', 'bar')
+            
+            if chart_type == 'none':
+                return None
+            
+            # 从建议中获取列名
+            x_col = suggestion.get('x_axis') or suggestion.get('category')
+            y_col = suggestion.get('y_axis') or suggestion.get('value')
+            
+            # 如果建议中没有指定列，自动选择
+            if not x_col or not y_col:
+                auto_x, auto_y = self._auto_select_columns(df)
+                x_col = x_col or auto_x
+                y_col = y_col or auto_y
+            
+            print(f"[DEBUG] 建议中的列: x_axis={suggestion.get('x_axis')}, y_axis={suggestion.get('y_axis')}")
+            print(f"[DEBUG] 最终使用列: x={x_col}, y={y_col}")
+            
+            if not x_col or not y_col:
+                return None
+            
+            # 创建图表配置，使用数据分析师建议的标题
+            title = suggestion.get('title', f'{chart_type.title()}图表')
+            
+            chart_config = {
+                'chart_type': chart_type,
+                'title': title,
+                'x_column': x_col,
+                'y_column': y_col,
+                'x_axis': x_col,  # 兼容不同的字段名
+                'y_axis': y_col,
+                'category': x_col,
+                'value': y_col
+            }
+            
+            return self._create_plotly_chart(df, chart_config)
+            
+        except Exception as e:
+            print(f"从建议创建图表失败: {e}")
+            import traceback
+            print(traceback.format_exc())
             return None
     
 
@@ -365,6 +461,47 @@ class ChatBIGradioApp:
                 
         except Exception as e:
             return "❌ 刷新失败", f"刷新失败: {str(e)}"
+    
+    def _create_default_chart(self, df: pd.DataFrame) -> Optional[go.Figure]:
+        """创建默认图表"""
+        try:
+            # 自动选择列
+            x_col, y_col = self._auto_select_columns(df)
+            
+            if not x_col or not y_col:
+                return None
+            
+            # 根据数据类型选择图表类型
+            numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+            categorical_cols = df.select_dtypes(exclude=['number']).columns.tolist()
+            
+            if categorical_cols and numeric_cols:
+                chart_type = 'bar'
+            elif len(numeric_cols) >= 2:
+                chart_type = 'scatter'
+            else:
+                chart_type = 'bar'
+            
+            # 创建图表
+            title = f"{y_col} vs {x_col}"
+            
+            if chart_type == 'bar':
+                fig = px.bar(df, x=x_col, y=y_col, title=title)
+            elif chart_type == 'scatter':
+                fig = px.scatter(df, x=x_col, y=y_col, title=title)
+            else:
+                fig = px.bar(df, x=x_col, y=y_col, title=title)
+            
+            fig.update_layout(
+                height=400,
+                margin=dict(l=0, r=0, t=40, b=0)
+            )
+            
+            return fig
+            
+        except Exception as e:
+            print(f"创建默认图表失败: {e}")
+            return None
     
     def optimize_sql(self, sql: str) -> Tuple[str, str]:
         """优化SQL查询"""

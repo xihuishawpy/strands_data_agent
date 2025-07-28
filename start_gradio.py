@@ -18,11 +18,20 @@ def check_dependencies():
         except ImportError:
             missing.append(package)
     
+    # 检查plotly.express
+    try:
+        import plotly.express as px
+        import plotly.graph_objects as go
+    except ImportError:
+        if 'plotly' not in missing:
+            missing.append('plotly')
+    
     if missing:
         print(f"❌ 缺少依赖包: {', '.join(missing)}")
         print(f"请运行: pip install {' '.join(missing)}")
         return False
     
+    print("✅ 所有依赖包检查通过")
     return True
 
 def main():
