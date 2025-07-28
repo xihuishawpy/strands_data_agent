@@ -1,0 +1,642 @@
+{
+  "all_tables": {
+    "data": [
+      "dim_edd_budget",
+      "dim_edd_city",
+      "dim_edd_pbidata",
+      "dim_edd_plscxcomparison"
+    ],
+    "timestamp": 1753716993.020988
+  },
+  "table_schema_dim_edd_budget": {
+    "data": {
+      "table_name": "dim_edd_budget",
+      "columns": [
+        {
+          "name": "year_month",
+          "type": "BIGINT",
+          "nullable": true,
+          "default": null,
+          "comment": "年月"
+        },
+        {
+          "name": "scx_subject",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "scx 科目"
+        },
+        {
+          "name": "material_code",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "物料代码"
+        },
+        {
+          "name": "dept_city",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "部门所在城市"
+        },
+        {
+          "name": "aggregate_city",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "归集城市"
+        },
+        {
+          "name": "detail_dept",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "明细部门"
+        },
+        {
+          "name": "data_category",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "amount",
+          "type": "DOUBLE",
+          "nullable": true,
+          "default": null,
+          "comment": "金额数值，单位为元"
+        },
+        {
+          "name": "month",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "attribute",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "dw_update_date",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "数据更新时间"
+        },
+        {
+          "name": "dw_upload_date",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "数据上传时间"
+        }
+      ],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "timestamp": 1753716993.051527
+  },
+  "table_schema_dim_edd_city": {
+    "data": {
+      "table_name": "dim_edd_city",
+      "columns": [
+        {
+          "name": "region",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "业务大区名称"
+        },
+        {
+          "name": "province",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "省份"
+        },
+        {
+          "name": "city_known",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "城市名称"
+        },
+        {
+          "name": "product_line_mapped",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "产品线名称"
+        },
+        {
+          "name": "material_code",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "物料代码"
+        },
+        {
+          "name": "dw_update_date",
+          "type": "DOUBLE",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "dw_upload_date",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        }
+      ],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "timestamp": 1753716993.0565681
+  },
+  "table_schema_dim_edd_pbidata": {
+    "data": {
+      "table_name": "dim_edd_pbidata",
+      "columns": [
+        {
+          "name": "year_month",
+          "type": "BIGINT",
+          "nullable": true,
+          "default": null,
+          "comment": "财务数据的年月，格式如202505"
+        },
+        {
+          "name": "scx_subject",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "科目名称"
+        },
+        {
+          "name": "material_code",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "物料代码"
+        },
+        {
+          "name": "dept_city",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "部门所在城市"
+        },
+        {
+          "name": "aggregate_city",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "费用归集城市"
+        },
+        {
+          "name": "detail_dept",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "明细部门"
+        },
+        {
+          "name": "data_category",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "amount",
+          "type": "DOUBLE",
+          "nullable": true,
+          "default": null,
+          "comment": "金额数值，单位为元\""
+        },
+        {
+          "name": "material_name",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "物料名称"
+        },
+        {
+          "name": "product_line_code",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "产品线代码"
+        },
+        {
+          "name": "product_line_name",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "产品线名称"
+        },
+        {
+          "name": "business_unit_name",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "事业部名称"
+        },
+        {
+          "name": "dw_update_date",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "dw_upload_date",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        }
+      ],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "timestamp": 1753716993.062928
+  },
+  "table_schema_dim_edd_plscxcomparison": {
+    "data": {
+      "table_name": "dim_edd_plscxcomparison",
+      "columns": [
+        {
+          "name": "scx_subject_pl",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "损益表科目名称"
+        },
+        {
+          "name": "scx_subject_budget",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "预算科目名称"
+        },
+        {
+          "name": "cost_major_category",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "成本大类"
+        },
+        {
+          "name": "cost_minor_category",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": "成本小类"
+        },
+        {
+          "name": "dw_update_date",
+          "type": "DOUBLE",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "dw_upload_date",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        }
+      ],
+      "primary_keys": [],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "timestamp": 1753716993.069264
+  },
+  "database_schema": {
+    "data": {
+      "database_type": "mysql",
+      "tables": {
+        "dim_edd_budget": {
+          "table_name": "dim_edd_budget",
+          "columns": [
+            {
+              "name": "year_month",
+              "type": "BIGINT",
+              "nullable": true,
+              "default": null,
+              "comment": "年月"
+            },
+            {
+              "name": "scx_subject",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "scx 科目"
+            },
+            {
+              "name": "material_code",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "物料代码"
+            },
+            {
+              "name": "dept_city",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "部门所在城市"
+            },
+            {
+              "name": "aggregate_city",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "归集城市"
+            },
+            {
+              "name": "detail_dept",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "明细部门"
+            },
+            {
+              "name": "data_category",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "amount",
+              "type": "DOUBLE",
+              "nullable": true,
+              "default": null,
+              "comment": "金额数值，单位为元"
+            },
+            {
+              "name": "month",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "attribute",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "dw_update_date",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "数据更新时间"
+            },
+            {
+              "name": "dw_upload_date",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "数据上传时间"
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [],
+          "indexes": []
+        },
+        "dim_edd_city": {
+          "table_name": "dim_edd_city",
+          "columns": [
+            {
+              "name": "region",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "业务大区名称"
+            },
+            {
+              "name": "province",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "省份"
+            },
+            {
+              "name": "city_known",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "城市名称"
+            },
+            {
+              "name": "product_line_mapped",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "产品线名称"
+            },
+            {
+              "name": "material_code",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "物料代码"
+            },
+            {
+              "name": "dw_update_date",
+              "type": "DOUBLE",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "dw_upload_date",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [],
+          "indexes": []
+        },
+        "dim_edd_pbidata": {
+          "table_name": "dim_edd_pbidata",
+          "columns": [
+            {
+              "name": "year_month",
+              "type": "BIGINT",
+              "nullable": true,
+              "default": null,
+              "comment": "财务数据的年月，格式如202505"
+            },
+            {
+              "name": "scx_subject",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "科目名称"
+            },
+            {
+              "name": "material_code",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "物料代码"
+            },
+            {
+              "name": "dept_city",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "部门所在城市"
+            },
+            {
+              "name": "aggregate_city",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "费用归集城市"
+            },
+            {
+              "name": "detail_dept",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "明细部门"
+            },
+            {
+              "name": "data_category",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "amount",
+              "type": "DOUBLE",
+              "nullable": true,
+              "default": null,
+              "comment": "金额数值，单位为元\""
+            },
+            {
+              "name": "material_name",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "物料名称"
+            },
+            {
+              "name": "product_line_code",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "产品线代码"
+            },
+            {
+              "name": "product_line_name",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "产品线名称"
+            },
+            {
+              "name": "business_unit_name",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "事业部名称"
+            },
+            {
+              "name": "dw_update_date",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "dw_upload_date",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [],
+          "indexes": []
+        },
+        "dim_edd_plscxcomparison": {
+          "table_name": "dim_edd_plscxcomparison",
+          "columns": [
+            {
+              "name": "scx_subject_pl",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "损益表科目名称"
+            },
+            {
+              "name": "scx_subject_budget",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "预算科目名称"
+            },
+            {
+              "name": "cost_major_category",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "成本大类"
+            },
+            {
+              "name": "cost_minor_category",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": "成本小类"
+            },
+            {
+              "name": "dw_update_date",
+              "type": "DOUBLE",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "dw_upload_date",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            }
+          ],
+          "primary_keys": [],
+          "foreign_keys": [],
+          "indexes": []
+        }
+      },
+      "relationships": []
+    },
+    "timestamp": 1753716993.069891
+  }
+}

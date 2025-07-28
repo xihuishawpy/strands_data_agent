@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatBI - 智能数据查询应用</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --light-bg: #f8fafc;
+            --dark-bg: #1e293b;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .chat-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .chat-messages {
+            height: 500px;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #fafafa;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+
+        .message.user {
+            background: var(--primary-color);
+            color: white;
+            margin-left: auto;
+        }
+
+        .message.assistant {
+            background: white;
+            border: 1px solid #e2e8f0;
+            margin-right: auto;
+        }
+
+        .input-section {
+            padding: 1.5rem;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .loading {
+            display: none;
+        }
+
+        .loading.show {
+            display: inline-block;
+        }
+
+        .result-section {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .sql-code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            margin: 0.5rem 0;
+            overflow-x: auto;
+        }
+
+        .data-table {
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .chart-container {
+            margin: 1rem 0;
+            text-align: center;
+        }
+
+        .sidebar {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .status-healthy { background-color: var(--success-color); }
+        .status-warning { background-color: var(--warning-color); }
+        .status-error { background-color: var(--danger-color); }
+
+        .example-queries {
+            margin-top: 1rem;
+        }
+
+        .example-query {
+            background: #e0f2fe;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .example-query:hover {
+            background: #b3e5fc;
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                margin: 1rem;
+                border-radius: 10px;
+            }
+            
+            .message {
+                max-width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-chart-line me-2"></i>ChatBI - 智能数据查询
+            </span>
+            <div class="d-flex">
+                <button class="btn btn-outline-light me-2" onclick="showSystemStatus()">
+                    <i class="fas fa-info-circle"></i> 系统状态
+                </button>
+                <button class="btn btn-outline-light" onclick="showDocs()">
+                    <i class="fas fa-book"></i> API文档
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-3">
+                <div class="sidebar">
+                    <h5><i class="fas fa-lightbulb text-warning"></i> 查询示例</h5>
+                    <div class="example-queries">
+                        <div class="example-query" onclick="setQuery('显示所有用户信息')">
+                            显示所有用户信息
+                        </div>
+                        <div class="example-query" onclick="setQuery('统计每个月的订单数量')">
+                            统计每个月的订单数量
+                        </div>
+                        <div class="example-query" onclick="setQuery('查看销售额最高的产品')">
+                            查看销售额最高的产品
+                        </div>
+                        <div class="example-query" onclick="setQuery('分析用户年龄分布')">
+                            分析用户年龄分布
+                        </div>
+                        <div class="example-query" onclick="setQuery('显示过去7天的销售趋势')">
+                            显示过去7天的销售趋势
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar">
+                    <h5><i class="fas fa-database text-info"></i> 系统信息</h5>
+                    <div id="systemInfo">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="status-indicator status-healthy"></span>
+                            <span>系统运行正常</span>
+                        </div>
+                        <small class="text-muted">点击"系统状态"查看详细信息</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主聊天区域 -->
+            <div class="col-md-9">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <h3><i class="fas fa-robot me-2"></i>ChatBI 智能助手</h3>
+                        <p class="mb-0">输入您的问题，我将帮您查询和分析数据</p>
+                    </div>
+
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message assistant">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-robot text-primary me-2 mt-1"></i>
+                                <div>
+                                    <strong>ChatBI助手</strong>
+                                    <p class="mb-0 mt-1">您好！我是ChatBI智能数据查询助手。您可以用自然语言向我提问，我会：</p>
+                                    <ul class="mt-2 mb-0">
+                                        <li>🔧 自动生成SQL查询</li>
+                                        <li>📊 执行查询并获取数据</li>
+                                        <li>📈 智能分析数据</li>
+                                        <li>📋 自动生成可视化图表</li>
+                                    </ul>
+                                    <p class="mt-2 mb-0">试试左侧的示例问题，或者直接输入您的问题吧！</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-section">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="input-group">
+                                    <input type="text" 
+                                           class="form-control form-control-lg" 
+                                           id="queryInput" 
+                                           placeholder="输入您的问题，例如：显示所有用户信息"
+                                           onkeypress="handleKeyPress(event)">
+                                    <button class="btn btn-primary btn-lg" onclick="sendQuery()">
+                                        <span class="loading spinner-border spinner-border-sm me-1" role="status"></span>
+                                        <i class="fas fa-paper-plane"></i> 发送
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="autoVisualize" checked>
+                                    <label class="form-check-label" for="autoVisualize">
+                                        自动生成图表
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <select class="form-select form-select-sm" id="analysisLevel">
+                                    <option value="basic">基础分析</option>
+                                    <option value="standard" selected>标准分析</option>
+                                    <option value="detailed">详细分析</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系统状态模态框 -->
+    <div class="modal fade" id="statusModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">系统状态</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="statusContent">
+                    加载中...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 设置查询内容
+        function setQuery(query) {
+            document.getElementById('queryInput').value = query;
+            document.getElementById('queryInput').focus();
+        }
+
+        // 处理回车键
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendQuery();
+            }
+        }
+
+        // 发送查询
+        async function sendQuery() {
+            const input = document.getElementById('queryInput');
+            const query = input.value.trim();
+            
+            if (!query) {
+                alert('请输入您的问题');
+                return;
+            }
+
+            // 显示加载状态
+            const loading = document.querySelector('.loading');
+            const button = document.querySelector('.btn-primary');
+            loading.classList.add('show');
+            button.disabled = true;
+
+            // 添加用户消息到聊天
+            addMessage('user', query);
+            
+            // 清空输入框
+            input.value = '';
+
+            try {
+                // 准备请求数据
+                const requestData = {
+                    question: query,
+                    auto_visualize: document.getElementById('autoVisualize').checked,
+                    analysis_level: document.getElementById('analysisLevel').value
+                };
+
+                // 发送请求
+                const response = await fetch('/api/v1/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    displayResult(result);
+                } else {
+                    addMessage('assistant', `❌ 抱歉，查询失败：${result.error}`);
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('assistant', `❌ 系统错误：${error.message}`);
+            } finally {
+                // 隐藏加载状态
+                loading.classList.remove('show');
+                button.disabled = false;
+            }
+        }
+
+        // 添加消息到聊天
+        function addMessage(type, content) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            if (type === 'user') {
+                messageDiv.innerHTML = `
+                    <div class="d-flex align-items-start">
+                        <div class="flex-grow-1 text-end">
+                            <strong>您</strong>
+                            <p class="mb-0 mt-1">${content}</p>
+                        </div>
+                        <i class="fas fa-user text-white ms-2 mt-1"></i>
+                    </div>
+                `;
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-robot text-primary me-2 mt-1"></i>
+                        <div>
+                            <strong>ChatBI助手</strong>
+                            <div class="mt-1">${content}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // 显示查询结果
+        function displayResult(result) {
+            let content = '';
+            
+            // SQL查询
+            if (result.sql_query) {
+                content += `
+                    <div class="mb-3">
+                        <h6><i class="fas fa-code text-info"></i> 生成的SQL查询：</h6>
+                        <div class="sql-code">${result.sql_query}</div>
+                    </div>
+                `;
+            }
+
+            // 数据表格
+            if (result.data && result.data.length > 0) {
+                content += `
+                    <div class="mb-3">
+                        <h6><i class="fas fa-table text-success"></i> 查询结果 (${result.data.length}行)：</h6>
+                        <div class="data-table">
+                            ${generateTable(result.data)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 数据分析
+            if (result.analysis) {
+                content += `
+                    <div class="mb-3">
+                        <h6><i class="fas fa-chart-bar text-warning"></i> 数据分析：</h6>
+                        <div class="analysis-content">${formatAnalysis(result.analysis)}</div>
+                    </div>
+                `;
+            }
+
+            // 图表信息
+            if (result.chart_info && result.chart_info.success) {
+                content += `
+                    <div class="mb-3">
+                        <h6><i class="fas fa-chart-pie text-primary"></i> 数据可视化：</h6>
+                        <div class="chart-container">
+                            <p>图表已生成：${result.chart_info.title}</p>
+                            <p><small class="text-muted">文件路径：${result.chart_info.file_path}</small></p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 执行信息
+            if (result.execution_time) {
+                content += `
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-clock"></i> 执行时间：${result.execution_time.toFixed(2)}秒
+                        </small>
+                    </div>
+                `;
+            }
+
+            addMessage('assistant', content);
+        }
+
+        // 生成表格HTML
+        function generateTable(data) {
+            if (!data || data.length === 0) return '<p>无数据</p>';
+            
+            const headers = Object.keys(data[0]);
+            const maxRows = 10; // 最多显示10行
+            
+            let html = '<table class="table table-striped table-sm">';
+            html += '<thead class="table-dark"><tr>';
+            headers.forEach(header => {
+                html += `<th>${header}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            data.slice(0, maxRows).forEach(row => {
+                html += '<tr>';
+                headers.forEach(header => {
+                    const value = row[header] !== null && row[header] !== undefined ? row[header] : '';
+                    html += `<td>${value}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            
+            if (data.length > maxRows) {
+                html += `<p class="text-muted text-center">... 还有 ${data.length - maxRows} 行数据未显示</p>`;
+            }
+            
+            return html;
+        }
+
+        // 格式化分析内容
+        function formatAnalysis(analysis) {
+            // 简单的markdown到HTML转换
+            return analysis
+                .replace(/### (.*)/g, '<h6 class="text-primary mt-3">$1</h6>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+
+        // 显示系统状态
+        async function showSystemStatus() {
+            try {
+                const response = await fetch('/api/v1/system/status');
+                const status = await response.json();
+                
+                let statusHtml = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>系统状态</h6>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="status-indicator status-${status.status}"></span>
+                                <span>${getStatusText(status.status)}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>数据库连接</h6>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="status-indicator ${status.database_connected ? 'status-healthy' : 'status-error'}"></span>
+                                <span>${status.database_connected ? '已连接' : '连接失败'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h6>Schema缓存</h6>
+                            <p>${status.schema_cache_status}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>配置状态</h6>
+                            <p>${status.config_valid ? '配置有效' : '配置无效'}</p>
+                        </div>
+                    </div>
+                `;
+                
+                if (status.warnings && status.warnings.length > 0) {
+                    statusHtml += `
+                        <div class="mt-3">
+                            <h6>警告信息</h6>
+                            <ul class="list-unstyled">
+                                ${status.warnings.map(warning => `<li class="text-warning">⚠️ ${warning}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('statusContent').innerHTML = statusHtml;
+                new bootstrap.Modal(document.getElementById('statusModal')).show();
+                
+            } catch (error) {
+                document.getElementById('statusContent').innerHTML = `<p class="text-danger">获取系统状态失败：${error.message}</p>`;
+                new bootstrap.Modal(document.getElementById('statusModal')).show();
+            }
+        }
+
+        // 获取状态文本
+        function getStatusText(status) {
+            switch (status) {
+                case 'healthy': return '健康';
+                case 'warning': return '警告';
+                case 'error': return '错误';
+                default: return '未知';
+            }
+        }
+
+        // 显示API文档
+        function showDocs() {
+            window.open('/docs', '_blank');
+        }
+
+        // 页面加载完成后获取系统状态
+        document.addEventListener('DOMContentLoaded', function() {
+            // 可以在这里添加初始化代码
+        });
+    </script>
+</body>
+</html> 
