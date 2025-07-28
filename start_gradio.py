@@ -36,7 +36,8 @@ def check_dependencies():
 
 def main():
     """主函数"""
-    print("🚀 正在启动ChatBI Gradio界面...")
+    print("🚀 ChatBI Gradio界面启动器")
+    print("=" * 40)
     
     # 检查依赖
     if not check_dependencies():
@@ -47,23 +48,48 @@ def main():
         print("⚠️  未找到.env配置文件")
         print("请确保已正确配置数据库连接和API密钥")
     
-    # 启动Gradio应用
-    try:
-        from gradio_app import create_gradio_interface
+    # 选择界面类型
+    print("\n请选择界面类型:")
+    print("1. 💬 对话式界面 (推荐) - 人机交互式对话体验")
+    print("2. 📋 传统界面 - 多标签页功能界面")
+    
+    while True:
+        choice = input("\n请输入选择 (1/2): ").strip()
         
-        interface = create_gradio_interface()
-        print("✅ 界面创建成功")
-        print("🌐 访问地址: http://localhost:7860")
-        
-        interface.launch(
-            server_name="0.0.0.0",
-            server_port=7860,
-            share=False
-        )
-        
-    except Exception as e:
-        print(f"❌ 启动失败: {e}")
-        sys.exit(1)
+        if choice == "1":
+            print("🚀 启动对话式界面...")
+            try:
+                from gradio_app_chat import create_chat_interface
+                interface = create_chat_interface()
+                interface_type = "对话式"
+                break
+            except Exception as e:
+                print(f"❌ 对话式界面启动失败: {e}")
+                sys.exit(1)
+                
+        elif choice == "2":
+            print("🚀 启动传统界面...")
+            try:
+                from gradio_app import create_gradio_interface
+                interface = create_gradio_interface()
+                interface_type = "传统"
+                break
+            except Exception as e:
+                print(f"❌ 传统界面启动失败: {e}")
+                sys.exit(1)
+        else:
+            print("❌ 无效选择，请输入 1 或 2")
+    
+    print(f"✅ {interface_type}界面创建成功")
+    print("🌐 访问地址: http://localhost:7860")
+    print("📖 使用说明请查看对应的README文件")
+    
+    interface.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False,
+        inbrowser=True
+    )
 
 if __name__ == "__main__":
     main() 
