@@ -58,7 +58,7 @@ class ChatBIGradioApp:
             return False, error_msg
     
     def test_connection(self) -> Tuple[str, str]:
-        """测试数据库连接"""
+        """测试数据库连接"""    
         try:
             if not self.connector:
                 return "❌ 连接失败", "数据库连接器未初始化"
@@ -148,25 +148,56 @@ class ChatBIGradioApp:
                 return "❌ 错误", "系统未初始化", "", None, ""
             
             # 执行查询
-            print(f"[DEBUG] 开始执行查询: {question}")
+            print(f"[DEBUG] 🚀 开始智能查询流程: {question}")
             result = self.orchestrator.query(
                 question=question,
                 auto_visualize=auto_viz,
                 analysis_level=analysis_level
             )
-            print(f"[DEBUG] 查询结果: 成功={result.success}, SQL={result.sql_query}, 数据行数={len(result.data) if result.data else 0}")
+            
+            # 详细的调试信息
+            print(f"[DEBUG] 查询结果: 成功={result.success}")
+            if result.sql_query:
+                print(f"[DEBUG] 生成SQL: {result.sql_query}")
+            if result.data:
+                print(f"[DEBUG] 数据行数: {len(result.data)}")
+            if result.analysis:
+                print(f"[DEBUG] 分析完成: {len(result.analysis)} 字符")
+            if result.chart_info:
+                print(f"[DEBUG] 可视化: {result.chart_info.get('chart_type', 'none')}")
             
             if not result.success:
-                print(f"[DEBUG] 查询失败原因: {result.error}")
-            
-            if not result.success:
+                print(f"[DEBUG] ❌ 查询失败: {result.error}")
                 return "❌ 查询失败", result.error or "未知错误", "", None, ""
             
             # 构建返回结果
-            status = "✅ 查询成功"
+            status = "✅ 智能查询流程完成"
+            
+            # 添加流程摘要
+            metadata = result.metadata or {}
+            process_summary = []
+            process_summary.append(f"📊 数据行数: {metadata.get('row_count', 0)}")
+            process_summary.append(f"⏱️ 执行时间: {result.execution_time:.2f}秒")
+            
+            if metadata.get('visualization_suggestion'):
+                viz_type = metadata['visualization_suggestion'].get('chart_type', 'none')
+                process_summary.append(f"🎨 可视化建议: {viz_type}")
+            
+            status += f" ({', '.join(process_summary)})"
             
             # SQL查询
-            sql_display = f"```sql\n{result.sql_query}\n```" if result.sql_query else "无SQL查询"
+            if result.sql_query:
+                sql_parts = ["### 🔧 生成的SQL查询\n"]
+                sql_parts.append(f"```sql\n{result.sql_query}\n```")
+                
+                # 添加SQL分析信息
+                if metadata.get('schema_tables_used'):
+                    tables_used = metadata['schema_tables_used']
+                    sql_parts.append(f"\n**涉及的表**: {', '.join(tables_used)}")
+                
+                sql_display = "\n".join(sql_parts)
+            else:
+                sql_display = "### ❌ SQL生成失败\n无法生成有效的SQL查询"
             
             # 数据结果
             data_display = ""
@@ -176,24 +207,77 @@ class ChatBIGradioApp:
                 # 创建DataFrame用于显示
                 df = pd.DataFrame(result.data)
                 
-                # 限制显示行数
+                # 构建数据显示
+                data_parts = ["### 📊 查询结果"]
+                data_parts.append(f"**总行数**: {len(df)}")
+                data_parts.append(f"**列数**: {len(df.columns)}")
+                data_parts.append(f"**字段**: {', '.join(df.columns)}\n")
+                
+                # 限制显示行数并格式化数字
                 display_df = df.head(20)
-                data_display = f"### 📊 查询结果 (共{len(df)}行)\n\n"
-                data_display += display_df.to_markdown(index=False)
+                
+                # 格式化数字显示，避免科学计数法
+                formatted_df = display_df.copy()
+                for col in formatted_df.columns:
+                    if formatted_df[col].dtype in ['int64', 'float64']:
+                        # 对于数字列，格式化显示
+                        formatted_df[col] = formatted_df[col].apply(self._format_number)
+                
+                data_parts.append("**数据预览**:")
+                data_parts.append(formatted_df.to_markdown(index=False))
                 
                 if len(df) > 20:
-                    data_display += f"\n\n*仅显示前20行，总共{len(df)}行*"
+                    data_parts.append(f"\n*仅显示前20行，总共{len(df)}行*")
+                
+                # 添加数据统计信息
+                if len(df) > 0:
+                    numeric_cols = df.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        data_parts.append(f"\n**数值字段统计**:")
+                        for col in numeric_cols[:3]:  # 最多显示3个数值字段的统计
+                            stats = df[col].describe()
+                            min_val = self._format_number(stats['min'])
+                            max_val = self._format_number(stats['max'])
+                            mean_val = self._format_number(stats['mean'])
+                            data_parts.append(f"- **{col}**: 最小值={min_val}, 最大值={max_val}, 平均值={mean_val}")
+                
+                data_display = "\n".join(data_parts)
                 
                 # 准备图表数据
                 if auto_viz and result.chart_info and result.chart_info.get('success'):
                     chart_data = self._create_plotly_chart(df, result.chart_info)
             else:
-                data_display = "查询未返回数据"
+                data_display = "### ⚠️ 无数据\n查询执行成功但未返回数据"
             
             # 分析结果
             analysis_display = ""
             if result.analysis:
-                analysis_display = f"### 🔍 数据分析\n\n{result.analysis}"
+                analysis_parts = ["### 🔍 智能数据分析"]
+                analysis_parts.append(f"**分析级别**: {analysis_level}")
+                analysis_parts.append("")
+                analysis_parts.append(result.analysis)
+                
+                # 添加可视化建议信息
+                if metadata.get('visualization_suggestion'):
+                    viz_suggestion = metadata['visualization_suggestion']
+                    analysis_parts.append("\n---")
+                    analysis_parts.append("### 🎨 可视化建议")
+                    analysis_parts.append(f"**推荐图表类型**: {viz_suggestion.get('chart_type', 'none')}")
+                    
+                    if viz_suggestion.get('reason'):
+                        analysis_parts.append(f"**选择理由**: {viz_suggestion.get('reason')}")
+                    
+                    if auto_viz and result.chart_info:
+                        if result.chart_info.get('success'):
+                            analysis_parts.append("**状态**: ✅ 可视化已生成")
+                        else:
+                            analysis_parts.append(f"**状态**: ❌ 可视化生成失败 - {result.chart_info.get('error', '未知错误')}")
+                    elif not auto_viz:
+                        analysis_parts.append("**状态**: ⏸️ 自动可视化已关闭")
+                
+                analysis_display = "\n".join(analysis_parts)
+            else:
+                analysis_display = "### ℹ️ 无分析结果\n未执行数据分析或分析级别设置为'none'"
             
             # 添加到聊天历史
             self.chat_history.append({
@@ -243,45 +327,7 @@ class ChatBIGradioApp:
             print(f"图表创建失败: {e}")
             return None
     
-    def explain_query(self, question: str) -> Tuple[str, str]:
-        """解释查询计划"""
-        if not question.strip():
-            return "❌ 错误", "请输入查询问题"
-        
-        try:
-            if not self.orchestrator:
-                return "❌ 错误", "系统未初始化"
-            
-            explanation = self.orchestrator.explain_query(question)
-            
-            if "error" in explanation:
-                return "❌ 解释失败", explanation["error"]
-            
-            # 构建解释信息
-            info_parts = ["### 🔍 查询解释\n"]
-            
-            info_parts.append(f"**原始问题:** {explanation.get('question', 'N/A')}")
-            
-            if explanation.get('sql_query'):
-                info_parts.append(f"**生成的SQL:**")
-                info_parts.append(f"```sql\n{explanation['sql_query']}\n```")
-            
-            if explanation.get('sql_valid'):
-                info_parts.append("**SQL有效性:** ✅ 有效")
-            else:
-                info_parts.append("**SQL有效性:** ❌ 无效")
-            
-            if explanation.get('tables_involved'):
-                info_parts.append(f"**涉及的表:** {', '.join(explanation['tables_involved'])}")
-            
-            if explanation.get('execution_plan'):
-                info_parts.append("**执行计划:**")
-                info_parts.append(f"```\n{explanation['execution_plan']}\n```")
-            
-            return "✅ 解释成功", "\n".join(info_parts)
-            
-        except Exception as e:
-            return "❌ 解释失败", f"查询解释失败: {str(e)}"
+
     
     def get_chat_history(self) -> str:
         """获取聊天历史"""
@@ -371,6 +417,44 @@ class ChatBIGradioApp:
             
         except Exception as e:
             return "❌ 优化失败", f"SQL优化失败: {str(e)}"
+    
+    def _format_number(self, value):
+        """格式化数字显示，避免科学计数法"""
+        try:
+            if pd.isna(value):
+                return "N/A"
+            
+            # 转换为数字
+            num = float(value)
+            
+            # 如果是整数，直接显示为整数
+            if num.is_integer():
+                num = int(num)
+                # 对大数字添加千分位分隔符
+                if abs(num) >= 1000:
+                    return f"{num:,}"
+                else:
+                    return str(num)
+            
+            # 对于小数
+            # 如果数字很大或很小，但在合理范围内，避免科学计数法
+            if abs(num) >= 1e6:
+                # 大于百万的数字，显示为百万、千万、亿等
+                if abs(num) >= 1e8:  # 亿
+                    return f"{num/1e8:.2f}亿"
+                elif abs(num) >= 1e4:  # 万
+                    return f"{num/1e4:.2f}万"
+                else:
+                    return f"{num:,.2f}"
+            elif abs(num) < 0.01 and abs(num) > 0:
+                # 很小的小数，保留更多位数
+                return f"{num:.6f}".rstrip('0').rstrip('.')
+            else:
+                # 正常范围的小数，保留2位
+                return f"{num:.2f}".rstrip('0').rstrip('.')
+                
+        except (ValueError, TypeError):
+            return str(value)
 
 def create_gradio_interface():
     """创建Gradio界面"""
@@ -431,7 +515,6 @@ def create_gradio_interface():
                 
                 with gr.Row():
                     query_btn = gr.Button("🔍 执行查询", variant="primary")
-                    explain_btn = gr.Button("📋 解释查询", variant="secondary")
                 
                 # 查询选项
                 with gr.Row():
@@ -474,10 +557,7 @@ def create_gradio_interface():
                 schema_status = gr.Textbox(label="获取状态", interactive=False)
             schema_display = gr.Markdown("点击'获取Schema信息'查看数据库结构")
         
-        # 查询解释面板
-        with gr.Accordion("🔍 查询解释", open=False):
-            explain_status = gr.Textbox(label="解释状态", interactive=False)
-            explain_display = gr.Markdown("使用'解释查询'按钮获取详细解释")
+
         
         # SQL优化面板
         with gr.Accordion("🚀 SQL优化", open=False):
@@ -508,11 +588,7 @@ def create_gradio_interface():
             outputs=[result_status, sql_display, data_display, chart_display, analysis_display]
         )
         
-        explain_btn.click(
-            fn=app.explain_query,
-            inputs=[question_input],
-            outputs=[explain_status, explain_display]
-        )
+
         
         get_schema_btn.click(
             fn=app.get_schema_info,
@@ -570,5 +646,6 @@ if __name__ == "__main__":
         server_port=7860,
         share=False,
         debug=False,
-        show_error=True
+        show_error=True,
+        pwa=True
     ) 
