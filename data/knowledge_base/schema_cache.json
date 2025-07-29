@@ -6,7 +6,7 @@
       "dim_edd_pbidata",
       "dim_edd_plscxcomparison"
     ],
-    "timestamp": 1753720129.4592519
+    "timestamp": 1753754547.004075
   },
   "table_schema_dim_edd_budget": {
     "data": {
@@ -17,14 +17,14 @@
           "type": "BIGINT",
           "nullable": true,
           "default": null,
-          "comment": "年月"
+          "comment": "预算年月"
         },
         {
           "name": "scx_subject",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "scx 科目"
+          "comment": "预算科目"
         },
         {
           "name": "material_code",
@@ -66,42 +66,42 @@
           "type": "DOUBLE",
           "nullable": true,
           "default": null,
-          "comment": "金额数值，单位为元"
+          "comment": "预算金额"
         },
         {
           "name": "month",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": null
+          "comment": "预算月份"
         },
         {
           "name": "attribute",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": null
+          "comment": "预算年"
         },
         {
           "name": "dw_update_date",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "数据更新时间"
+          "comment": null
         },
         {
           "name": "dw_upload_date",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "数据上传时间"
+          "comment": null
         }
       ],
       "primary_keys": [],
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1753720129.4850109
+    "timestamp": 1753754547.1817696
   },
   "table_schema_dim_edd_city": {
     "data": {
@@ -112,7 +112,7 @@
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "业务大区名称"
+          "comment": "大区"
         },
         {
           "name": "province",
@@ -126,14 +126,14 @@
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "城市名称"
+          "comment": "城市"
         },
         {
           "name": "product_line_mapped",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "产品线名称"
+          "comment": "产品线"
         },
         {
           "name": "material_code",
@@ -161,7 +161,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1753720129.490479
+    "timestamp": 1753754547.2429445
   },
   "table_schema_dim_edd_pbidata": {
     "data": {
@@ -172,14 +172,14 @@
           "type": "BIGINT",
           "nullable": true,
           "default": null,
-          "comment": "财务数据的年月，格式如202505"
+          "comment": "成本年月"
         },
         {
           "name": "scx_subject",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "科目名称"
+          "comment": "工资等成本科目"
         },
         {
           "name": "material_code",
@@ -193,21 +193,21 @@
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "部门所在城市"
+          "comment": "部门城市"
         },
         {
           "name": "aggregate_city",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "费用归集城市"
+          "comment": "归集城市"
         },
         {
           "name": "detail_dept",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "明细部门"
+          "comment": "环境业务等部门名称"
         },
         {
           "name": "data_category",
@@ -221,7 +221,7 @@
           "type": "DOUBLE",
           "nullable": true,
           "default": null,
-          "comment": "金额数值，单位为元\""
+          "comment": "成本金额"
         },
         {
           "name": "material_name",
@@ -242,7 +242,7 @@
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "产品线名称"
+          "comment": "职业卫生产品线等产品线名称"
         },
         {
           "name": "business_unit_name",
@@ -270,7 +270,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1753720129.49563
+    "timestamp": 1753754547.368261
   },
   "table_schema_dim_edd_plscxcomparison": {
     "data": {
@@ -281,14 +281,14 @@
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "损益表科目名称"
+          "comment": "PL成本科目"
         },
         {
           "name": "scx_subject_budget",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "预算科目名称"
+          "comment": "预算科目"
         },
         {
           "name": "cost_major_category",
@@ -323,7 +323,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1753720129.500334
+    "timestamp": 1753754547.512794
   },
   "database_schema": {
     "data": {
@@ -337,14 +337,14 @@
               "type": "BIGINT",
               "nullable": true,
               "default": null,
-              "comment": "年月"
+              "comment": "预算年月"
             },
             {
               "name": "scx_subject",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "scx 科目"
+              "comment": "预算科目"
             },
             {
               "name": "material_code",
@@ -386,35 +386,35 @@
               "type": "DOUBLE",
               "nullable": true,
               "default": null,
-              "comment": "金额数值，单位为元"
+              "comment": "预算金额"
             },
             {
               "name": "month",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": null
+              "comment": "预算月份"
             },
             {
               "name": "attribute",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": null
+              "comment": "预算年"
             },
             {
               "name": "dw_update_date",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "数据更新时间"
+              "comment": null
             },
             {
               "name": "dw_upload_date",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "数据上传时间"
+              "comment": null
             }
           ],
           "primary_keys": [],
@@ -429,7 +429,7 @@
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "业务大区名称"
+              "comment": "大区"
             },
             {
               "name": "province",
@@ -443,14 +443,14 @@
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "城市名称"
+              "comment": "城市"
             },
             {
               "name": "product_line_mapped",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "产品线名称"
+              "comment": "产品线"
             },
             {
               "name": "material_code",
@@ -486,14 +486,14 @@
               "type": "BIGINT",
               "nullable": true,
               "default": null,
-              "comment": "财务数据的年月，格式如202505"
+              "comment": "成本年月"
             },
             {
               "name": "scx_subject",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "科目名称"
+              "comment": "工资等成本科目"
             },
             {
               "name": "material_code",
@@ -507,21 +507,21 @@
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "部门所在城市"
+              "comment": "部门城市"
             },
             {
               "name": "aggregate_city",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "费用归集城市"
+              "comment": "归集城市"
             },
             {
               "name": "detail_dept",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "明细部门"
+              "comment": "环境业务等部门名称"
             },
             {
               "name": "data_category",
@@ -535,7 +535,7 @@
               "type": "DOUBLE",
               "nullable": true,
               "default": null,
-              "comment": "金额数值，单位为元\""
+              "comment": "成本金额"
             },
             {
               "name": "material_name",
@@ -556,7 +556,7 @@
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "产品线名称"
+              "comment": "职业卫生产品线等产品线名称"
             },
             {
               "name": "business_unit_name",
@@ -592,14 +592,14 @@
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "损益表科目名称"
+              "comment": "PL成本科目"
             },
             {
               "name": "scx_subject_budget",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "预算科目名称"
+              "comment": "预算科目"
             },
             {
               "name": "cost_major_category",
@@ -637,6 +637,6 @@
       },
       "relationships": []
     },
-    "timestamp": 1753720129.5010629
+    "timestamp": 1753754547.5157807
   }
 }

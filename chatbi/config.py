@@ -6,8 +6,10 @@
 import os
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
+import urllib.parse
 from dotenv import load_dotenv
 import logging
+
 
 # 加载环境变量
 load_dotenv()
@@ -28,7 +30,8 @@ class DatabaseConfig:
         if self.type == "postgresql":
             return f"postgresql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
         elif self.type == "mysql":
-            return f"mysql+pymysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            password_encode = urllib.parse.quote_plus(self.password)
+            return f"mysql+pymysql://{self.username}:{password_encode}@{self.host}:{self.port}/{self.database}"
         elif self.type == "sqlite":
             return f"sqlite:///{self.database}"
         else:
