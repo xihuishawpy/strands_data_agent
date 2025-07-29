@@ -5,6 +5,108 @@
     "description": "",
     "business_meaning": "",
     "category": "财务预算",
-    "columns": {}
+    "columns": {
+      "year_month": {
+        "name": "year_month",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": [
+          "202301"
+        ]
+      },
+      "scx_subject": {
+        "name": "scx_subject",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": [
+          "住房公积金"
+        ]
+      },
+      "material_code": {
+        "name": "material_code",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": [
+          "EAM",
+          "EDD"
+        ]
+      },
+      "dept_city": {
+        "name": "dept_city",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "aggregate_city": {
+        "name": "aggregate_city",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": [
+          "合肥",
+          "广州"
+        ]
+      },
+      "detail_dept": {
+        "name": "detail_dept",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "data_category": {
+        "name": "data_category",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "amount": {
+        "name": "amount",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": [
+          "2343.2",
+          "16733.82"
+        ]
+      },
+      "month": {
+        "name": "month",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": [
+          "2023年1月"
+        ]
+      },
+      "attribute": {
+        "name": "attribute",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": [
+          "2023预算"
+        ]
+      },
+      "dw_update_date": {
+        "name": "dw_update_date",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "dw_upload_date": {
+        "name": "dw_upload_date",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": []
+      }
+    }
   }
 }

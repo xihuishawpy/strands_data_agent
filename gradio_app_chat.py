@@ -626,6 +626,214 @@ class ChatBIApp:
             return f"❌ JSON格式错误: {str(e)}"
         except Exception as e:
             return f"❌ 导入失败: {str(e)}"
+    
+    def get_columns_dataframe(self, table_name: str) -> Tuple[pd.DataFrame, str]:
+        """获取表的字段信息DataFrame"""
+        try:
+            if not table_name:
+                return pd.DataFrame(), "请选择一个表"
+            
+            if not self.schema_manager:
+                return pd.DataFrame(), "Schema管理器未初始化"
+            
+            # 获取表结构信息
+            table_schema = self.schema_manager.get_table_schema(table_name)
+            columns = table_schema.get("columns", [])
+            
+            if not columns:
+                return pd.DataFrame(), f"表 {table_name} 没有字段信息"
+            
+            # 获取表的元数据
+            table_metadata = None
+            if self.metadata_manager:
+                table_metadata = self.metadata_manager.get_table_metadata(table_name)
+            
+            # 构建DataFrame数据
+            df_data = []
+            for col in columns:
+                col_name = col.get("name", "")
+                col_type = col.get("type", "")
+                
+                # 获取字段的元数据
+                business_name = ""
+                description = ""
+                business_meaning = ""
+                data_examples = ""
+                
+                if table_metadata and col_name in table_metadata.columns:
+                    col_metadata = table_metadata.columns[col_name]
+                    business_name = col_metadata.business_name
+                    description = col_metadata.description
+                    business_meaning = col_metadata.business_meaning
+                    data_examples = ", ".join(col_metadata.data_examples)
+                
+                df_data.append([
+                    col_name,
+                    col_type,
+                    business_name,
+                    description,
+                    business_meaning,
+                    data_examples
+                ])
+            
+            df = pd.DataFrame(df_data, columns=[
+                "字段名", "数据类型", "业务名称", "字段描述", "业务含义", "数据示例"
+            ])
+            
+            return df, f"✅ 已加载表 {table_name} 的 {len(df)} 个字段"
+            
+        except Exception as e:
+            return pd.DataFrame(), f"获取字段信息失败: {str(e)}"
+    
+    def update_columns_from_dataframe(self, table_name: str, df: pd.DataFrame) -> str:
+        """从DataFrame更新字段元数据"""
+        try:
+            if not table_name:
+                return "❌ 请选择一个表"
+            
+            if not self.metadata_manager:
+                return "❌ 元数据管理器未初始化"
+            
+            if df is None or df.empty:
+                return "❌ 没有数据可更新"
+            
+            success_count = 0
+            error_count = 0
+            
+            for index, row in df.iterrows():
+                try:
+                    col_name = str(row.get("字段名", "")).strip()
+                    if not col_name:
+                        continue
+                    
+                    business_name = str(row.get("业务名称", "")).strip()
+                    description = str(row.get("字段描述", "")).strip()
+                    business_meaning = str(row.get("业务含义", "")).strip()
+                    data_examples_str = str(row.get("数据示例", "")).strip()
+                    
+                    # 处理数据示例
+                    data_examples = []
+                    if data_examples_str:
+                        data_examples = [ex.strip() for ex in data_examples_str.split(",") if ex.strip()]
+                    
+                    # 更新字段元数据
+                    success = self.metadata_manager.update_column_metadata(
+                        table_name=table_name,
+                        column_name=col_name,
+                        business_name=business_name,
+                        description=description,
+                        business_meaning=business_meaning,
+                        data_examples=data_examples
+                    )
+                    
+                    if success:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        
+                except Exception as e:
+                    error_count += 1
+                    print(f"更新字段 {col_name} 失败: {e}")
+            
+            if error_count == 0:
+                return f"✅ 成功更新 {success_count} 个字段的元数据"
+            else:
+                return f"⚠️ 更新完成：成功 {success_count} 个，失败 {error_count} 个"
+                
+        except Exception as e:
+            return f"❌ 批量更新失败: {str(e)}"
+    
+    def refresh_data_examples(self, table_name: str) -> Tuple[pd.DataFrame, str]:
+        """刷新表的数据示例"""
+        try:
+            if not table_name:
+                return pd.DataFrame(), "请选择一个表"
+            
+            if not self.connector:
+                return pd.DataFrame(), "数据库连接器未初始化"
+            
+            # 执行查询获取示例数据
+            sql_query = f"SELECT * FROM {table_name} LIMIT 2"
+            
+            try:
+                # 使用SQL执行器获取数据
+                from chatbi.database import get_sql_executor
+                sql_executor = get_sql_executor()
+                result = sql_executor.execute(sql_query)
+                
+                if not result.success or not result.data:
+                    # 即使没有数据，也返回当前的字段信息
+                    df, status = self.get_columns_dataframe(table_name)
+                    return df, f"⚠️ 表 {table_name} 中没有数据或查询失败，但已显示字段结构"
+                
+                # 处理示例数据
+                examples_dict = {}
+                for row in result.data:
+                    for col_name, value in row.items():
+                        if col_name not in examples_dict:
+                            examples_dict[col_name] = []
+                        
+                        # 格式化值
+                        if value is not None:
+                            formatted_value = str(value).strip()
+                            if formatted_value and formatted_value not in examples_dict[col_name]:
+                                examples_dict[col_name].append(formatted_value)
+                
+                # 更新元数据中的数据示例
+                if self.metadata_manager:
+                    for col_name, examples in examples_dict.items():
+                        # 获取现有的元数据
+                        existing_metadata = self.metadata_manager.get_table_metadata(table_name)
+                        existing_col_metadata = None
+                        if existing_metadata and col_name in existing_metadata.columns:
+                            existing_col_metadata = existing_metadata.columns[col_name]
+                        
+                        # 保留现有的业务信息，只更新数据示例
+                        self.metadata_manager.update_column_metadata(
+                            table_name=table_name,
+                            column_name=col_name,
+                            business_name=existing_col_metadata.business_name if existing_col_metadata else "",
+                            description=existing_col_metadata.description if existing_col_metadata else "",
+                            business_meaning=existing_col_metadata.business_meaning if existing_col_metadata else "",
+                            data_examples=examples
+                        )
+                
+                # 重新获取更新后的字段信息
+                df, _ = self.get_columns_dataframe(table_name)
+                return df, f"✅ 已刷新表 {table_name} 的数据示例，获取了 {len(result.data)} 行示例数据"
+                
+            except Exception as e:
+                # 查询失败时，仍然返回字段结构
+                df, _ = self.get_columns_dataframe(table_name)
+                return df, f"⚠️ 获取数据示例失败: {str(e)}，但已显示字段结构"
+                
+        except Exception as e:
+            return pd.DataFrame(), f"刷新数据示例失败: {str(e)}"
+    
+    def load_table_with_examples(self, table_name: str) -> Tuple[pd.DataFrame, str]:
+        """加载表字段信息并自动获取数据示例"""
+        try:
+            if not table_name:
+                return pd.DataFrame(), "请选择一个表"
+            
+            # 首先加载字段信息
+            df, status = self.get_columns_dataframe(table_name)
+            
+            if df.empty:
+                return df, status
+            
+            # 自动获取数据示例
+            try:
+                df_with_examples, example_status = self.refresh_data_examples(table_name)
+                if not df_with_examples.empty:
+                    return df_with_examples, f"✅ 已加载表 {table_name} 的字段信息并自动获取数据示例"
+                else:
+                    return df, f"✅ 已加载表 {table_name} 的字段信息，但无法获取数据示例"
+            except Exception as e:
+                return df, f"✅ 已加载表 {table_name} 的字段信息，数据示例获取失败: {str(e)}"
+                
+        except Exception as e:
+            return pd.DataFrame(), f"加载表信息失败: {str(e)}"
 
 def create_chat_interface():
     """创建对话式界面"""
@@ -797,7 +1005,7 @@ def create_chat_interface():
                     with gr.TabItem("🏷️ 字段信息管理"):
                         with gr.Row():
                             with gr.Column(scale=1):
-                                gr.Markdown("### 选择表和字段")
+                                gr.Markdown("### 表选择与操作")
                                 
                                 column_table_dropdown = gr.Dropdown(
                                     label="选择表",
@@ -806,44 +1014,39 @@ def create_chat_interface():
                                     allow_custom_value=False
                                 )
                                 
-                                column_dropdown = gr.Dropdown(
-                                    label="选择字段",
-                                    choices=[],
-                                    interactive=True,
-                                    allow_custom_value=False
-                                )
+                                with gr.Row():
+                                    load_columns_btn = gr.Button("📋 加载字段", variant="primary", size="sm")
+                                    refresh_examples_btn = gr.Button("🔄 刷新示例", variant="secondary", size="sm")
                                 
-                                load_column_btn = gr.Button("加载字段信息", variant="primary")
-                                column_status = gr.Textbox(label="状态", interactive=False)
+                                column_status = gr.Textbox(label="操作状态", interactive=False, lines=3)
+                                
+                                gr.Markdown("### 💡 使用说明")
+                                gr.Markdown("""
+                                **操作步骤：**
+                                1. 选择要管理的表
+                                2. 点击"加载字段"获取字段列表
+                                3. 点击"刷新示例"自动获取数据示例
+                                4. 直接在表格中编辑字段信息
+                                5. 修改后自动保存
+                                
+                                **字段说明：**
+                                - **业务名称**：字段的中文名称
+                                - **字段描述**：字段的详细说明
+                                - **业务含义**：字段在业务中的作用
+                                - **数据示例**：自动从数据库获取
+                                """)
                             
-                            with gr.Column(scale=2):
-                                gr.Markdown("### 字段元数据")
+                            with gr.Column(scale=3):
+                                gr.Markdown("### 📊 字段元数据管理")
+                                gr.Markdown("*在下方表格中直接编辑字段信息，修改后会自动保存到系统中*")
                                 
-                                column_business_name = gr.Textbox(
-                                    label="业务名称",
-                                    placeholder="例如：用户姓名",
-                                    lines=1
+                                columns_dataframe = gr.Dataframe(
+                                    headers=["字段名", "数据类型", "业务名称", "字段描述", "业务含义", "数据示例"],
+                                    datatype=["str", "str", "str", "str", "str", "str"],
+                                    interactive=True,
+                                    wrap=True,
+                                    label="字段信息表格"
                                 )
-                                
-                                column_description = gr.Textbox(
-                                    label="字段描述",
-                                    placeholder="例如：用户的真实姓名",
-                                    lines=2
-                                )
-                                
-                                column_business_meaning = gr.Textbox(
-                                    label="业务含义",
-                                    placeholder="例如：用户注册时填写的真实姓名，用于身份验证和显示",
-                                    lines=3
-                                )
-                                
-                                column_data_examples = gr.Textbox(
-                                    label="数据示例",
-                                    placeholder="例如：张三, 李四, 王五 (用逗号分隔)",
-                                    lines=2
-                                )
-                                
-                                save_column_btn = gr.Button("保存字段信息", variant="primary")
                     
                     # 数据导入导出
                     with gr.TabItem("📤 数据管理"):
@@ -934,22 +1137,23 @@ def create_chat_interface():
             outputs=[table_status]
         )
         
-        # 字段信息管理
-        column_table_dropdown.change(
-            fn=app.get_table_columns,
+        # 字段信息管理 - 表格模式
+        load_columns_btn.click(
+            fn=app.load_table_with_examples,
             inputs=[column_table_dropdown],
-            outputs=[column_dropdown]
+            outputs=[columns_dataframe, column_status]
         )
         
-        load_column_btn.click(
-            fn=app.get_column_metadata_info,
-            inputs=[column_table_dropdown, column_dropdown],
-            outputs=[column_business_name, column_description, column_business_meaning, column_data_examples, column_status]
+        refresh_examples_btn.click(
+            fn=app.refresh_data_examples,
+            inputs=[column_table_dropdown],
+            outputs=[columns_dataframe, column_status]
         )
         
-        save_column_btn.click(
-            fn=app.update_column_metadata_info,
-            inputs=[column_table_dropdown, column_dropdown, column_business_name, column_description, column_business_meaning, column_data_examples],
+        # 当表格数据变化时自动保存
+        columns_dataframe.change(
+            fn=app.update_columns_from_dataframe,
+            inputs=[column_table_dropdown, columns_dataframe],
             outputs=[column_status]
         )
         
