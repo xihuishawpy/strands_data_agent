@@ -5,10 +5,12 @@
 ## 功能特性
 
 - 🤖 **智能SQL生成**: 将自然语言转换为准确的SQL查询
+- 🧠 **RAG知识库**: 基于用户反馈的SQL知识库，提升查询准确性
 - 🔒 **安全执行**: 使用只读权限确保数据安全
 - 📊 **智能分析**: AI驱动的数据解读和洞察
 - 📈 **数据可视化**: 自动生成图表和可视化
 - 💬 **对话式交互**: 人机对话式的数据查询体验
+- 👍 **用户反馈**: 支持点赞机制，持续改进AI性能
 - 🏢 **企业级**: 支持多数据库、Schema管理、权限控制
 - 🔄 **多智能体协作**: 基于"智能体即工具"模式的架构
 
@@ -65,11 +67,26 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO chatbi_readonly;
 ### 3. 测试系统
 
 ```bash
+# 快速测试RAG功能
+python quick_test_rag.py
+
+# 简化版RAG演示
+python simple_rag_demo.py
+
+# 检查RAG功能配置
+python check_rag_setup.py
+
 # 测试数据库连接
 python debug_sql_execution.py
 
 # 测试完整流程
 python test_complete_flow.py
+
+# 测试SQL知识库功能
+python test_sql_knowledge_base.py
+
+# 演示SQL知识库完整工作流程
+python demo_sql_knowledge_base.py
 ```
 
 ### 4. 启动应用
@@ -85,6 +102,9 @@ python start_chat_ui.py
 
 # 直接启动传统界面
 python gradio_app.py
+
+# 启动带反馈功能的界面 (推荐)
+python gradio_app_with_feedback.py
 
 # 使用命令行接口
 python cli.py "统计每个表的记录数"
@@ -113,7 +133,32 @@ ChatBI 采用**智能化五步流程**：
 🎨 可视化 → 自动选择图表类型，生成可视化
 ```
 
-### 6. 使用示例
+### 6. SQL知识库功能
+
+ChatBI集成了先进的RAG（检索增强生成）技术，通过用户反馈持续改进SQL生成质量：
+
+#### 🧠 智能检索匹配
+- **语义搜索**: 基于向量相似度匹配历史查询
+- **Q-Q相似度**: 计算问题间的语义相似度
+- **智能缓存**: 高相似度查询直接使用历史SQL
+
+#### 👍 用户反馈机制
+- **点赞收集**: 用户对满意结果进行点赞
+- **知识积累**: 点赞的Q-SQL对存储到向量数据库
+- **质量提升**: 基于反馈数据持续优化生成效果
+
+#### 🔄 RAG工作流程
+```
+用户提问 → 向量检索 → 相似度判断
+    ↓
+高相似度 → 直接返回缓存SQL
+    ↓
+中相似度 → 使用相似示例辅助生成
+    ↓
+低相似度 → 常规SQL生成流程
+```
+
+### 7. 使用示例
 
 ```python
 from chatbi import ChatBIOrchestrator
@@ -124,6 +169,18 @@ chatbi = ChatBIOrchestrator()
 # 查询示例
 result = chatbi.query("显示过去6个月每月的销售趋势")
 print(result)
+
+# 添加正面反馈
+if result.success:
+    chatbi.add_positive_feedback(
+        question="显示过去6个月每月的销售趋势",
+        sql=result.sql_query,
+        description="月度销售趋势分析"
+    )
+
+# 查看知识库统计
+stats = chatbi.get_knowledge_stats()
+print(f"知识库条目数: {stats['total_items']}")
 ```
 
 ## 项目结构
@@ -205,18 +262,19 @@ class CustomAnalysisAgent(BaseAgent):
 - **预期效果**: 用户可以实时看到AI的思考和处理过程，减少等待焦虑
 - **优先级**: 高
 
-### 2. SQL RAG 构建
+### 2. SQL RAG 构建 ✅
 - **功能描述**: 构建SQL知识库，提升SQL生成的准确性和一致性
 - **技术要点**:
-  - 收集和整理高质量SQL示例
-  - 构建向量数据库存储SQL模式
-  - 实现语义检索匹配
-  - 集成到SQL生成流程
+  - ✅ 构建向量数据库存储SQL模式
+  - ✅ 实现语义检索匹配
+  - ✅ 集成到SQL生成流程
+  - ✅ 用户点赞后存储Q-SQL对到向量数据库
+  - ✅ 查询时先进行RAG知识库匹配
 - **预期效果**: 
   - 提高复杂查询的生成准确率
   - 减少SQL语法错误
   - 支持企业特定的SQL模式和最佳实践
-- **优先级**: 中
+- **优先级**: 已完成
 
 ### 开发路线图
 

@@ -68,6 +68,12 @@ class Config:
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
         self.log_file = os.getenv("LOG_FILE", "./logs/chatbi.log")
         
+        # RAG知识库配置
+        self.rag_enabled = os.getenv("RAG_ENABLED", "true").lower() == "true"
+        self.rag_similarity_threshold = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.7"))
+        self.rag_confidence_threshold = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.85"))
+        self.rag_max_examples = int(os.getenv("RAG_MAX_EXAMPLES", "3"))
+        
         # 确保目录存在
         self._ensure_directories()
         

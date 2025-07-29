@@ -1,12 +1,14 @@
 """
 SQL生成智能体
 专门负责将自然语言转换为SQL查询
+集成RAG知识库功能
 """
 
 import logging
 from typing import Dict, Any, Optional, List
 from .base import BaseAgent
 from ..config import config
+from ..knowledge_base.sql_knowledge_manager import get_knowledge_manager
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,9 @@ class SQLGeneratorAgent(BaseAgent):
     def __init__(self, model_name: Optional[str] = None):
         # 根据内存使用qwen-coder-plus处理代码相关任务
         model_name = model_name or config.llm.coder_model
+        
+        # 初始化知识库管理器
+        self.knowledge_manager = get_knowledge_manager()
         
         system_prompt = """
 你是一个世界级的数据库专家和SQL查询生成专家。你的职责是将用户的自然语言问题转换成准确、高效的SQL查询语句。
@@ -94,15 +99,17 @@ class SQLGeneratorAgent(BaseAgent):
                     question: str, 
                     schema_info: str, 
                     examples: Optional[List[Dict[str, str]]] = None,
-                    table_names: Optional[List[str]] = None) -> str:
+                    table_names: Optional[List[str]] = None,
+                    use_rag: bool = True) -> str:
         """
-        生成SQL查询
+        生成SQL查询（集成RAG功能）
         
         Args:
             question: 自然语言问题
             schema_info: 数据库Schema信息
             examples: SQL示例
             table_names: 相关表名列表
+            use_rag: 是否使用RAG知识库
             
         Returns:
             str: 生成的SQL查询或错误信息
@@ -111,6 +118,40 @@ class SQLGeneratorAgent(BaseAgent):
         is_valid, error_msg = self.validate_input(question)
         if not is_valid:
             return f"ERROR_INVALID_INPUT: {error_msg}"
+        
+        # 第一步：尝试从知识库检索
+        if use_rag and self.knowledge_manager.enabled:
+            rag_result = self.knowledge_manager.search_knowledge(question)
+            
+            if rag_result.found_match and rag_result.should_use_cached:
+                # 直接使用缓存的SQL
+                cached_sql = rag_result.best_match["sql"]
+                logger.info(f"🎯 使用RAG缓存SQL (相似度: {rag_result.confidence:.3f}): {cached_sql}")
+                
+                # 更新使用统计
+                self.knowledge_manager.update_usage_feedback(question, cached_sql, 0.1)
+                
+                return cached_sql
+            
+            elif rag_result.found_match:
+                # 使用相似示例辅助生成
+                if not examples:
+                    examples = []
+                
+                # 添加知识库中的相似示例
+                for similar_item in rag_result.similar_examples or []:
+                    examples.append({
+                        "question": similar_item["question"],
+                        "sql": similar_item["sql"]
+                    })
+                
+                logger.info(f"🔍 使用RAG示例辅助生成 (找到 {len(rag_result.similar_examples or [])} 个相似示例)")
+        
+        # 第二步：如果没有直接匹配，获取知识库示例
+        if use_rag and self.knowledge_manager.enabled and not examples:
+            examples = self.knowledge_manager.get_examples_for_generation(question)
+            if examples:
+                logger.info(f"📚 从知识库获取 {len(examples)} 个生成示例")
         
         # 构建上下文
         context = {
@@ -192,6 +233,28 @@ class SQLGeneratorAgent(BaseAgent):
                 return ' '.join(sql_lines)
         
         return ""
+    
+    def add_positive_feedback(self, question: str, sql: str, description: str = None) -> bool:
+        """
+        添加正面反馈到知识库
+        
+        Args:
+            question: 用户问题
+            sql: SQL查询
+            description: 描述信息
+            
+        Returns:
+            bool: 是否成功添加
+        """
+        if not self.knowledge_manager.enabled:
+            logger.warning("知识库未启用，无法添加反馈")
+            return False
+        
+        return self.knowledge_manager.add_positive_feedback(
+            question=question,
+            sql=sql,
+            description=description
+        )
     
     def validate_sql_safety(self, sql: str) -> tuple[bool, str]:
         """验证SQL安全性"""

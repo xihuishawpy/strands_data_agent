@@ -41,6 +41,10 @@ class ChatBIOrchestrator:
         self.sql_fixer = get_sql_fixer()
         self.visualizer = get_visualizer()
         
+        # 初始化知识库管理器
+        from .knowledge_base.sql_knowledge_manager import get_knowledge_manager
+        self.knowledge_manager = get_knowledge_manager()
+        
         # 缓存Schema信息
         self._schema_summary = None
         self._last_schema_update = 0
@@ -509,6 +513,44 @@ class ChatBIOrchestrator:
         except Exception as e:
             logger.error(f"可视化创建失败: {str(e)}")
             return None
+    
+    def add_positive_feedback(self, question: str, sql: str, description: str = None) -> bool:
+        """
+        添加正面反馈（用户点赞）
+        
+        Args:
+            question: 用户问题
+            sql: SQL查询
+            description: 描述信息
+            
+        Returns:
+            bool: 是否成功添加到知识库
+        """
+        try:
+            success = self.knowledge_manager.add_positive_feedback(
+                question=question,
+                sql=sql,
+                description=description or "用户点赞的高质量查询"
+            )
+            
+            if success:
+                logger.info(f"✅ 成功添加用户反馈到知识库")
+            else:
+                logger.warning("⚠️ 添加用户反馈失败")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"❌ 添加用户反馈时出错: {str(e)}")
+            return False
+    
+    def get_knowledge_stats(self) -> Dict[str, Any]:
+        """获取知识库统计信息"""
+        try:
+            return self.knowledge_manager.get_knowledge_stats()
+        except Exception as e:
+            logger.error(f"获取知识库统计失败: {str(e)}")
+            return {"error": str(e), "enabled": False}
     
     def _extract_tables_from_sql(self, sql_query: str) -> List[str]:
         """从SQL中提取表名"""

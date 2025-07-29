@@ -87,7 +87,7 @@
       "attribute": {
         "name": "attribute",
         "business_name": "",
-        "description": "预算",
+        "description": "预算年",
         "business_meaning": "",
         "data_examples": [
           "2023预算"

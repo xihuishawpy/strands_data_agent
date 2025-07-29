@@ -37,6 +37,7 @@ class ChatBIGradioApp:
         self.schema_manager = None
         self.sql_fixer = None
         self.chat_history = []
+        self.last_query_result = None  # 存储最后一次查询结果，用于反馈
         
         # 尝试初始化组件
         self._initialize_components()
@@ -291,6 +292,9 @@ class ChatBIGradioApp:
                 analysis_display = "\n".join(analysis_parts)
             else:
                 analysis_display = "### ℹ️ 无分析结果\n未执行数据分析或分析级别设置为'none'"
+            
+            # 保存查询结果用于反馈
+            self.last_query_result = result
             
             # 添加到聊天历史
             self.chat_history.append({
@@ -555,6 +559,59 @@ class ChatBIGradioApp:
         except Exception as e:
             return "❌ 优化失败", f"SQL优化失败: {str(e)}"
     
+    def add_positive_feedback(self, description: str = "") -> str:
+        """添加正面反馈到知识库"""
+        if not self.last_query_result or not self.last_query_result.success:
+            return "❌ 没有可反馈的查询结果"
+        
+        try:
+            success = self.orchestrator.add_positive_feedback(
+                question=self.last_query_result.question,
+                sql=self.last_query_result.sql_query,
+                description=description or "用户点赞的高质量查询"
+            )
+            
+            if success:
+                return "✅ 感谢反馈！已将此查询添加到知识库，将帮助改进未来的查询生成"
+            else:
+                return "⚠️ 反馈添加失败，可能是知识库未启用"
+        
+        except Exception as e:
+            return f"❌ 反馈添加失败: {str(e)}"
+    
+    def get_knowledge_stats(self) -> str:
+        """获取知识库统计信息"""
+        try:
+            stats = self.orchestrator.get_knowledge_stats()
+            
+            if stats.get("enabled"):
+                return f"""
+### 📊 SQL知识库统计
+
+- **总条目数**: {stats.get('total_items', 0)}
+- **平均评分**: {stats.get('avg_rating', 0):.2f}
+- **总使用次数**: {stats.get('total_usage', 0)}
+- **高评分条目**: {stats.get('top_rated_count', 0)}
+- **集合名称**: {stats.get('collection_name', 'N/A')}
+- **状态**: ✅ 启用
+
+### 💡 知识库说明
+知识库通过收集用户反馈的高质量查询，使用RAG技术提升SQL生成的准确性和一致性。当您对查询结果满意时，请点击"👍 添加到知识库"按钮。
+                """
+            else:
+                return f"""
+### ❌ SQL知识库未启用
+
+**原因**: {stats.get('reason', '未知原因')}
+
+### 🔧 启用方法
+1. 安装依赖: `pip install chromadb sentence-transformers`
+2. 设置API密钥: 确保DASHSCOPE_API_KEY已配置
+3. 重启应用
+                """
+        except Exception as e:
+            return f"❌ 获取知识库统计失败: {str(e)}"
+    
     def _format_number(self, value):
         """格式化数字显示，避免科学计数法"""
         try:
@@ -674,6 +731,20 @@ def create_gradio_interface():
         # 状态显示
         result_status = gr.Textbox(label="查询状态", interactive=False)
         
+        # 反馈区域
+        with gr.Row():
+            with gr.Column(scale=3):
+                feedback_info = gr.Markdown("执行查询后，如果结果满意，可以添加到知识库以改进AI性能")
+            with gr.Column(scale=1):
+                feedback_description = gr.Textbox(
+                    label="反馈描述 (可选)",
+                    placeholder="描述这个查询的用途...",
+                    lines=1
+                )
+                like_btn = gr.Button("👍 添加到知识库", variant="secondary", size="sm")
+        
+        feedback_result = gr.Markdown("")
+        
         with gr.Tabs():
             with gr.TabItem("SQL查询"):
                 sql_display = gr.Markdown("等待查询...")
@@ -686,6 +757,11 @@ def create_gradio_interface():
             
             with gr.TabItem("智能分析"):
                 analysis_display = gr.Markdown("等待查询...")
+            
+            with gr.TabItem("📚 知识库"):
+                with gr.Row():
+                    refresh_stats_btn = gr.Button("刷新统计", size="sm")
+                knowledge_stats = gr.Markdown("点击'刷新统计'查看知识库状态")
         
         # Schema信息面板
         with gr.Accordion("🗄️ 数据库Schema信息", open=False):

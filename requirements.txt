@@ -24,7 +24,7 @@ gradio>=4.0.0
 
 # 知识库和向量搜索
 chromadb>=0.4.0
-# sentence-transformers>=2.2.0
+sentence-transformers>=2.2.0
 
 # 配置管理
 python-dotenv>=1.0.0
