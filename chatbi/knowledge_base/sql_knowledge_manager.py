@@ -4,6 +4,7 @@ SQL知识库管理器
 """
 
 import logging
+import json
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -257,6 +258,124 @@ class SQLKnowledgeManager:
                 "enabled": False,
                 "error": str(e)
             }
+    
+    def get_all_knowledge_items(self) -> List[Dict[str, Any]]:
+        """获取所有知识库条目"""
+        if not self.enabled or not self.vector_store:
+            return []
+        
+        try:
+            # 获取所有数据
+            all_data = self.vector_store.collection.get(
+                include=['documents', 'metadatas']
+            )
+            
+            items = []
+            if all_data['ids']:
+                for i, item_id in enumerate(all_data['ids']):
+                    metadata = all_data['metadatas'][i]
+                    items.append({
+                        'id': item_id,
+                        'question': metadata.get('question', ''),
+                        'sql': metadata.get('sql', ''),
+                        'description': metadata.get('description', ''),
+                        'tags': json.loads(metadata.get('tags', '[]')),
+                        'rating': float(metadata.get('rating', 0.0)),
+                        'usage_count': int(metadata.get('usage_count', 0)),
+                        'created_at': metadata.get('created_at', ''),
+                        'updated_at': metadata.get('updated_at', '')
+                    })
+            
+            # 按创建时间排序
+            items.sort(key=lambda x: x['created_at'], reverse=True)
+            return items
+            
+        except Exception as e:
+            logger.error(f"获取知识库条目失败: {str(e)}")
+            return []
+    
+    def update_knowledge_item(self, item_id: str, question: str, sql: str, 
+                             description: str = "", tags: List[str] = None) -> bool:
+        """更新知识库条目"""
+        if not self.enabled or not self.vector_store:
+            return False
+        
+        try:
+            # 获取现有条目
+            existing = self.vector_store.collection.get(
+                ids=[item_id],
+                include=['metadatas']
+            )
+            
+            if not existing['metadatas']:
+                logger.warning(f"条目不存在: {item_id}")
+                return False
+            
+            # 更新元数据
+            metadata = existing['metadatas'][0]
+            metadata.update({
+                'question': question,
+                'sql': sql,
+                'description': description,
+                'tags': json.dumps(tags or []),
+                'updated_at': datetime.now().isoformat()
+            })
+            
+            # 重新生成文档内容
+            doc_content = self.vector_store._build_document_content(
+                question, sql, description, tags
+            )
+            
+            # 生成新的embedding
+            embedding = self.vector_store.embedding_service.embed_text(doc_content)
+            
+            # 更新向量数据库
+            self.vector_store.collection.update(
+                ids=[item_id],
+                documents=[doc_content],
+                metadatas=[metadata],
+                embeddings=[embedding]
+            )
+            
+            logger.info(f"成功更新知识库条目: {item_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"更新知识库条目失败: {str(e)}")
+            return False
+    
+    def delete_knowledge_item(self, item_id: str) -> bool:
+        """删除知识库条目"""
+        if not self.enabled or not self.vector_store:
+            return False
+        
+        try:
+            self.vector_store.collection.delete(ids=[item_id])
+            logger.info(f"成功删除知识库条目: {item_id}")
+            return True
+        except Exception as e:
+            logger.error(f"删除知识库条目失败: {str(e)}")
+            return False
+    
+    def add_knowledge_item(self, question: str, sql: str, description: str = "", 
+                          tags: List[str] = None, rating: float = 1.0) -> bool:
+        """添加新的知识库条目"""
+        if not self.enabled or not self.vector_store:
+            return False
+        
+        try:
+            item_id = self.vector_store.add_sql_knowledge(
+                question=question,
+                sql=sql,
+                description=description,
+                tags=tags or [],
+                rating=rating
+            )
+            logger.info(f"成功添加知识库条目: {item_id}")
+            return True
+        except Exception as e:
+            logger.error(f"添加知识库条目失败: {str(e)}")
+            return False
     
     def _extract_sql_tags(self, sql: str) -> List[str]:
         """从SQL中提取标签"""

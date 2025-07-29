@@ -432,6 +432,129 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
         except Exception as e:
             return f"❌ 获取知识库统计失败: {str(e)}"
     
+    def get_knowledge_table(self) -> pd.DataFrame:
+        """获取知识库表格数据"""
+        try:
+            items = self.orchestrator.knowledge_manager.get_all_knowledge_items()
+            
+            if not items:
+                return pd.DataFrame(columns=['ID', '问题', 'SQL查询', '描述', '标签', '评分', '使用次数', '创建时间'])
+            
+            # 转换为DataFrame
+            df_data = []
+            for item in items:
+                tags_str = ', '.join(item['tags']) if item['tags'] else ''
+                created_time = item['created_at'][:19] if item['created_at'] else ''  # 只显示日期时间部分
+                
+                df_data.append([
+                    item['id'],
+                    item['question'],
+                    item['sql'],
+                    item['description'],
+                    tags_str,
+                    item['rating'],
+                    item['usage_count'],
+                    created_time
+                ])
+            
+            df = pd.DataFrame(df_data, columns=[
+                'ID', '问题', 'SQL查询', '描述', '标签', '评分', '使用次数', '创建时间'
+            ])
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"获取知识库表格失败: {str(e)}")
+            return pd.DataFrame(columns=['ID', '问题', 'SQL查询', '描述', '标签', '评分', '使用次数', '创建时间'])
+    
+    def add_knowledge_item(self, question: str, sql: str, description: str = "", tags: str = "") -> str:
+        """添加知识库条目"""
+        if not question.strip() or not sql.strip():
+            return "❌ 问题和SQL查询不能为空"
+        
+        try:
+            # 解析标签
+            tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()] if tags else []
+            
+            success = self.orchestrator.knowledge_manager.add_knowledge_item(
+                question=question.strip(),
+                sql=sql.strip(),
+                description=description.strip(),
+                tags=tag_list,
+                rating=1.0
+            )
+            
+            if success:
+                return "✅ 知识库条目添加成功"
+            else:
+                return "❌ 添加失败，请检查知识库状态"
+                
+        except Exception as e:
+            return f"❌ 添加失败: {str(e)}"
+    
+    def update_knowledge_item(self, item_id: str, question: str, sql: str, 
+                             description: str = "", tags: str = "") -> str:
+        """更新知识库条目"""
+        if not item_id or not question.strip() or not sql.strip():
+            return "❌ ID、问题和SQL查询不能为空"
+        
+        try:
+            # 解析标签
+            tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()] if tags else []
+            
+            success = self.orchestrator.knowledge_manager.update_knowledge_item(
+                item_id=item_id,
+                question=question.strip(),
+                sql=sql.strip(),
+                description=description.strip(),
+                tags=tag_list
+            )
+            
+            if success:
+                return "✅ 知识库条目更新成功"
+            else:
+                return "❌ 更新失败，条目可能不存在"
+                
+        except Exception as e:
+            return f"❌ 更新失败: {str(e)}"
+    
+    def delete_knowledge_item(self, item_id: str) -> str:
+        """删除知识库条目"""
+        if not item_id:
+            return "❌ 请提供条目ID"
+        
+        try:
+            success = self.orchestrator.knowledge_manager.delete_knowledge_item(item_id)
+            
+            if success:
+                return "✅ 知识库条目删除成功"
+            else:
+                return "❌ 删除失败，条目可能不存在"
+                
+        except Exception as e:
+            return f"❌ 删除失败: {str(e)}"
+    
+    def get_knowledge_item_by_id(self, item_id: str) -> tuple:
+        """根据ID获取知识库条目详情"""
+        try:
+            items = self.orchestrator.knowledge_manager.get_all_knowledge_items()
+            
+            for item in items:
+                if item['id'] == item_id:
+                    tags_str = ', '.join(item['tags']) if item['tags'] else ''
+                    return (
+                        item['question'],
+                        item['sql'],
+                        item['description'],
+                        tags_str,
+                        f"✅ 已加载条目: {item_id}"
+                    )
+            
+            return "", "", "", "", f"❌ 未找到条目: {item_id}"
+            
+        except Exception as e:
+            return "", "", "", "", f"❌ 获取条目失败: {str(e)}"
+    
     # 系统管理功能
     def test_connection(self) -> Tuple[str, str]:
         """测试数据库连接"""    
@@ -1107,7 +1230,7 @@ def create_chat_interface():
                                         example_btns.append(btn)
             
             # SQL知识库界面
-            with gr.TabItem("� SQL知识,库", elem_id="knowledge-tab"):
+            with gr.TabItem("� SQL知识库", elem_id="knowledge-tab"):
                 gr.Markdown("""
                 ## 🧠 SQL知识库管理
                 
@@ -1116,9 +1239,97 @@ def create_chat_interface():
                 
                 with gr.Row():
                     with gr.Column():
+                        # 知识库表格管理
+                        gr.Markdown("### 📊 知识库条目管理")
+                        with gr.Row():
+                            refresh_table_btn = gr.Button("🔄 刷新表格", variant="secondary", size="sm")
+                            add_new_btn = gr.Button("➕ 添加新条目", variant="primary", size="sm")
+                        
+                        knowledge_table = gr.Dataframe(
+                            headers=['ID', '问题', 'SQL查询', '描述', '标签', '评分', '使用次数', '创建时间'],
+                            datatype=['str', 'str', 'str', 'str', 'str', 'number', 'number', 'str'],
+                            interactive=False,
+                            wrap=True
+                        )
+                        
+                        # 编辑面板
+                        gr.Markdown("### ✏️ 编辑条目")
+                        
+                        selected_id = gr.Textbox(
+                            label="条目ID",
+                            placeholder="从表格中选择条目后自动填充",
+                            interactive=False
+                        )
+                        
+                        with gr.Row():
+                            with gr.Column():
+                                edit_question = gr.Textbox(
+                                    label="问题",
+                                    placeholder="输入自然语言问题",
+                                    lines=2
+                                )
+                                
+                                edit_sql = gr.Textbox(
+                                    label="SQL查询",
+                                    placeholder="输入SQL查询语句",
+                                    lines=3
+                                )
+                            
+                            with gr.Column():
+                                edit_description = gr.Textbox(
+                                    label="描述",
+                                    placeholder="输入查询描述（可选）",
+                                    lines=2
+                                )
+                                
+                                edit_tags = gr.Textbox(
+                                    label="标签",
+                                    placeholder="输入标签，用逗号分隔",
+                                    lines=1
+                                )
+                        
+                        with gr.Row():
+                            update_btn = gr.Button("💾 更新", variant="primary", size="sm")
+                            delete_btn = gr.Button("🗑️ 删除", variant="stop", size="sm")
+                        
+                        edit_result = gr.Markdown("")
+                        
+                        # 添加新条目面板
+                        gr.Markdown("### ➕ 添加新条目")
+                        
+                        with gr.Row():
+                            with gr.Column():
+                                new_question = gr.Textbox(
+                                    label="问题",
+                                    placeholder="输入自然语言问题",
+                                    lines=2
+                                )
+                                
+                                new_sql = gr.Textbox(
+                                    label="SQL查询",
+                                    placeholder="输入SQL查询语句",
+                                    lines=3
+                                )
+                            
+                            with gr.Column():
+                                new_description = gr.Textbox(
+                                    label="描述",
+                                    placeholder="输入查询描述（可选）",
+                                    lines=2
+                                )
+                                
+                                new_tags = gr.Textbox(
+                                    label="标签",
+                                    placeholder="输入标签，用逗号分隔（可选）",
+                                    lines=1
+                                )
+                        
+                        add_btn = gr.Button("➕ 添加到知识库", variant="primary")
+                        add_result = gr.Markdown("")
+                        
                         # 知识库统计
                         gr.Markdown("### 📊 知识库统计")
-                        refresh_stats_btn = gr.Button("刷新统计", variant="secondary")
+                        refresh_stats_btn = gr.Button("🔄 刷新统计", variant="secondary")
                         knowledge_stats = gr.Markdown("点击'刷新统计'查看知识库状态")
                         
                         # 使用说明
@@ -1359,6 +1570,73 @@ def create_chat_interface():
             outputs=[knowledge_stats]
         )
         
+        # 知识库表格管理功能
+        refresh_table_btn.click(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
+        )
+        
+        # 表格行选择事件
+        def on_table_select(evt: gr.SelectData):
+            if evt.index is not None and evt.index[0] is not None:
+                # 获取选中行的数据
+                df = app.get_knowledge_table()
+                if not df.empty and evt.index[0] < len(df):
+                    row = df.iloc[evt.index[0]]
+                    return (
+                        row['ID'],
+                        row['问题'],
+                        row['SQL查询'],
+                        row['描述'],
+                        row['标签'],
+                        f"✅ 已选择条目: {row['ID']}"
+                    )
+            return "", "", "", "", "", "❌ 请选择有效的表格行"
+        
+        knowledge_table.select(
+            fn=on_table_select,
+            outputs=[selected_id, edit_question, edit_sql, edit_description, edit_tags, edit_result]
+        )
+        
+        # 更新条目
+        update_btn.click(
+            fn=app.update_knowledge_item,
+            inputs=[selected_id, edit_question, edit_sql, edit_description, edit_tags],
+            outputs=[edit_result]
+        ).then(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
+        )
+        
+        # 删除条目
+        delete_btn.click(
+            fn=app.delete_knowledge_item,
+            inputs=[selected_id],
+            outputs=[edit_result]
+        ).then(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
+        ).then(
+            fn=lambda: ("", "", "", "", ""),
+            outputs=[selected_id, edit_question, edit_sql, edit_description, edit_tags]
+        )
+        
+        # 添加新条目
+        add_btn.click(
+            fn=app.add_knowledge_item,
+            inputs=[new_question, new_sql, new_description, new_tags],
+            outputs=[add_result]
+        ).then(
+            fn=lambda: ("", "", "", ""),
+            outputs=[new_question, new_sql, new_description, new_tags]
+        )
+        
+        # 快速添加按钮 - 清空编辑表单
+        add_new_btn.click(
+            fn=lambda: ("", "", "", "", ""),
+            outputs=[selected_id, edit_question, edit_sql, edit_description, edit_tags]
+        )
+        
         # 表信息维护功能事件绑定
         
         # 表信息管理
@@ -1428,6 +1706,9 @@ def create_chat_interface():
         interface.load(
             load_welcome,
             outputs=[chatbot, chart_display, knowledge_stats]
+        ).then(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
         )
     
     return interface
