@@ -222,7 +222,7 @@ SQL: {example['sql_query']}
 - **通信**: HTTP长连接 或 WebSocket
 
 ### SQL RAG
-- **向量数据库**: ChromaDB (轻量) 或 Pinecone (云端)
+- **向量数据库**: ChromaDB (轻量)
 - **嵌入模型**: SentenceTransformers
 - **检索算法**: 语义相似度 + 关键词匹配
 - **存储**: SQLite (本地) 或 PostgreSQL (生产)

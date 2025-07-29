@@ -21,7 +21,7 @@ try:
     import gradio as gr
     from chatbi.config import config
     from chatbi.orchestrator import get_orchestrator
-    from chatbi.database import get_database_connector, get_schema_manager
+    from chatbi.database import get_database_connector, get_schema_manager, get_table_metadata_manager
 except ImportError as e:
     print(f"导入错误: {e}")
     print("请确保已安装所有依赖: pip install gradio openai")
@@ -35,6 +35,7 @@ class ChatBIApp:
         self.orchestrator = None
         self.connector = None
         self.schema_manager = None
+        self.metadata_manager = None
         self.chat_history = []
         
         # 尝试初始化组件
@@ -46,6 +47,7 @@ class ChatBIApp:
             self.orchestrator = get_orchestrator()
             self.connector = get_database_connector()
             self.schema_manager = get_schema_manager()
+            self.metadata_manager = get_table_metadata_manager()
             return True, "✅ ChatBI系统初始化成功"
         except Exception as e:
             error_msg = f"❌ 系统初始化失败: {str(e)}"
@@ -448,6 +450,182 @@ class ChatBIApp:
                 
         except Exception as e:
             return "❌ 刷新失败", f"刷新失败: {str(e)}"
+    
+    # 表元数据管理功能
+    def get_table_list(self) -> List[str]:
+        """获取所有表名列表"""
+        try:
+            if not self.schema_manager:
+                return []
+            
+            schema = self.schema_manager.get_database_schema()
+            return list(schema.get("tables", {}).keys())
+            
+        except Exception as e:
+            print(f"获取表列表失败: {e}")
+            return []
+    
+    def get_table_columns(self, table_name: str) -> List[str]:
+        """获取指定表的字段列表"""
+        try:
+            if not self.schema_manager or not table_name:
+                return []
+            
+            table_schema = self.schema_manager.get_table_schema(table_name)
+            columns = table_schema.get("columns", [])
+            return [col.get("name", "") for col in columns if col.get("name")]
+            
+        except Exception as e:
+            print(f"获取表字段失败: {e}")
+            return []
+    
+    def get_table_metadata_info(self, table_name: str) -> Tuple[str, str, str, str, str]:
+        """获取表的元数据信息"""
+        try:
+            if not self.metadata_manager or not table_name:
+                return "", "", "", "", "请选择一个表"
+            
+            metadata = self.metadata_manager.get_table_metadata(table_name)
+            
+            if metadata:
+                return (
+                    metadata.business_name,
+                    metadata.description, 
+                    metadata.business_meaning,
+                    metadata.category,
+                    f"✅ 已加载表 {table_name} 的元数据"
+                )
+            else:
+                return "", "", "", "", f"表 {table_name} 暂无自定义元数据"
+                
+        except Exception as e:
+            return "", "", "", "", f"获取元数据失败: {str(e)}"
+    
+    def update_table_metadata_info(self, table_name: str, business_name: str, 
+                                  description: str, business_meaning: str, 
+                                  category: str) -> str:
+        """更新表的元数据信息"""
+        try:
+            if not self.metadata_manager:
+                return "❌ 元数据管理器未初始化"
+            
+            if not table_name:
+                return "❌ 请选择一个表"
+            
+            success = self.metadata_manager.update_table_metadata(
+                table_name=table_name,
+                business_name=business_name.strip(),
+                description=description.strip(),
+                business_meaning=business_meaning.strip(),
+                category=category.strip()
+            )
+            
+            if success:
+                return f"✅ 表 {table_name} 的元数据已更新"
+            else:
+                return f"❌ 更新表 {table_name} 的元数据失败"
+                
+        except Exception as e:
+            return f"❌ 更新失败: {str(e)}"
+    
+    def get_column_metadata_info(self, table_name: str, column_name: str) -> Tuple[str, str, str, str, str]:
+        """获取字段的元数据信息"""
+        try:
+            if not self.metadata_manager or not table_name or not column_name:
+                return "", "", "", "", "请选择表和字段"
+            
+            metadata = self.metadata_manager.get_table_metadata(table_name)
+            
+            if metadata and column_name in metadata.columns:
+                col_metadata = metadata.columns[column_name]
+                examples_text = ", ".join(col_metadata.data_examples)
+                return (
+                    col_metadata.business_name,
+                    col_metadata.description,
+                    col_metadata.business_meaning,
+                    examples_text,
+                    f"✅ 已加载字段 {column_name} 的元数据"
+                )
+            else:
+                return "", "", "", "", f"字段 {column_name} 暂无自定义元数据"
+                
+        except Exception as e:
+            return "", "", "", "", f"获取字段元数据失败: {str(e)}"
+    
+    def update_column_metadata_info(self, table_name: str, column_name: str,
+                                   business_name: str, description: str,
+                                   business_meaning: str, data_examples: str) -> str:
+        """更新字段的元数据信息"""
+        try:
+            if not self.metadata_manager:
+                return "❌ 元数据管理器未初始化"
+            
+            if not table_name or not column_name:
+                return "❌ 请选择表和字段"
+            
+            # 处理数据示例
+            examples_list = []
+            if data_examples.strip():
+                examples_list = [ex.strip() for ex in data_examples.split(",") if ex.strip()]
+            
+            success = self.metadata_manager.update_column_metadata(
+                table_name=table_name,
+                column_name=column_name,
+                business_name=business_name.strip(),
+                description=description.strip(),
+                business_meaning=business_meaning.strip(),
+                data_examples=examples_list
+            )
+            
+            if success:
+                return f"✅ 字段 {table_name}.{column_name} 的元数据已更新"
+            else:
+                return f"❌ 更新字段 {table_name}.{column_name} 的元数据失败"
+                
+        except Exception as e:
+            return f"❌ 更新失败: {str(e)}"
+    
+    def export_table_metadata(self) -> Tuple[str, str]:
+        """导出表元数据"""
+        try:
+            if not self.metadata_manager:
+                return "❌ 导出失败", "元数据管理器未初始化"
+            
+            metadata = self.metadata_manager.export_metadata()
+            
+            if metadata:
+                # 转换为JSON字符串
+                json_str = json.dumps(metadata, ensure_ascii=False, indent=2)
+                return "✅ 导出成功", json_str
+            else:
+                return "⚠️ 无数据", "暂无元数据可导出"
+                
+        except Exception as e:
+            return "❌ 导出失败", f"导出失败: {str(e)}"
+    
+    def import_table_metadata(self, json_data: str) -> str:
+        """导入表元数据"""
+        try:
+            if not self.metadata_manager:
+                return "❌ 元数据管理器未初始化"
+            
+            if not json_data.strip():
+                return "❌ 请输入有效的JSON数据"
+            
+            # 解析JSON数据
+            import_data = json.loads(json_data)
+            
+            success = self.metadata_manager.import_metadata(import_data)
+            
+            if success:
+                return "✅ 元数据导入成功"
+            else:
+                return "❌ 元数据导入失败"
+                
+        except json.JSONDecodeError as e:
+            return f"❌ JSON格式错误: {str(e)}"
+        except Exception as e:
+            return f"❌ 导入失败: {str(e)}"
 
 def create_chat_interface():
     """创建对话式界面"""
@@ -561,6 +739,135 @@ def create_chat_interface():
                 # Schema详细信息
                 with gr.Row():
                     schema_display = gr.Markdown("点击'获取Schema'查看数据库结构")
+            
+            # 表信息维护界面
+            with gr.TabItem("📝 表信息维护", elem_id="metadata-tab"):
+                gr.Markdown("""
+                ## 📝 表信息维护
+                
+                通过维护表和字段的业务信息，提高SQL生成的准确率和可理解性。
+                """)
+                
+                with gr.Tabs():
+                    # 表信息管理
+                    with gr.TabItem("📊 表信息管理"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                gr.Markdown("### 选择表")
+                                table_dropdown = gr.Dropdown(
+                                    label="选择表",
+                                    choices=app.get_table_list(),
+                                    interactive=True,
+                                    allow_custom_value=False
+                                )
+                                
+                                load_table_btn = gr.Button("加载表信息", variant="primary")
+                                table_status = gr.Textbox(label="状态", interactive=False)
+                            
+                            with gr.Column(scale=2):
+                                gr.Markdown("### 表元数据")
+                                
+                                table_business_name = gr.Textbox(
+                                    label="业务名称",
+                                    placeholder="例如：用户信息表",
+                                    lines=1
+                                )
+                                
+                                table_description = gr.Textbox(
+                                    label="表描述",
+                                    placeholder="例如：存储系统用户的基本信息",
+                                    lines=2
+                                )
+                                
+                                table_business_meaning = gr.Textbox(
+                                    label="业务含义",
+                                    placeholder="例如：记录注册用户的详细资料，包括个人信息和账户状态",
+                                    lines=3
+                                )
+                                
+                                table_category = gr.Textbox(
+                                    label="业务分类",
+                                    placeholder="例如：用户管理、基础数据",
+                                    lines=1
+                                )
+                                
+                                save_table_btn = gr.Button("保存表信息", variant="primary")
+                    
+                    # 字段信息管理
+                    with gr.TabItem("🏷️ 字段信息管理"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                gr.Markdown("### 选择表和字段")
+                                
+                                column_table_dropdown = gr.Dropdown(
+                                    label="选择表",
+                                    choices=app.get_table_list(),
+                                    interactive=True,
+                                    allow_custom_value=False
+                                )
+                                
+                                column_dropdown = gr.Dropdown(
+                                    label="选择字段",
+                                    choices=[],
+                                    interactive=True,
+                                    allow_custom_value=False
+                                )
+                                
+                                load_column_btn = gr.Button("加载字段信息", variant="primary")
+                                column_status = gr.Textbox(label="状态", interactive=False)
+                            
+                            with gr.Column(scale=2):
+                                gr.Markdown("### 字段元数据")
+                                
+                                column_business_name = gr.Textbox(
+                                    label="业务名称",
+                                    placeholder="例如：用户姓名",
+                                    lines=1
+                                )
+                                
+                                column_description = gr.Textbox(
+                                    label="字段描述",
+                                    placeholder="例如：用户的真实姓名",
+                                    lines=2
+                                )
+                                
+                                column_business_meaning = gr.Textbox(
+                                    label="业务含义",
+                                    placeholder="例如：用户注册时填写的真实姓名，用于身份验证和显示",
+                                    lines=3
+                                )
+                                
+                                column_data_examples = gr.Textbox(
+                                    label="数据示例",
+                                    placeholder="例如：张三, 李四, 王五 (用逗号分隔)",
+                                    lines=2
+                                )
+                                
+                                save_column_btn = gr.Button("保存字段信息", variant="primary")
+                    
+                    # 数据导入导出
+                    with gr.TabItem("📤 数据管理"):
+                        with gr.Row():
+                            with gr.Column():
+                                gr.Markdown("### 📤 导出元数据")
+                                export_btn = gr.Button("导出元数据", variant="primary")
+                                export_status = gr.Textbox(label="导出状态", interactive=False)
+                                export_data = gr.Textbox(
+                                    label="导出数据",
+                                    lines=10,
+                                    interactive=False,
+                                    placeholder="导出的JSON数据将显示在这里"
+                                )
+                            
+                            with gr.Column():
+                                gr.Markdown("### 📥 导入元数据")
+                                import_data = gr.Textbox(
+                                    label="导入数据",
+                                    lines=10,
+                                    placeholder="请粘贴要导入的JSON数据"
+                                )
+                                import_btn = gr.Button("导入元数据", variant="primary")
+                                import_status = gr.Textbox(label="导入状态", interactive=False)
         
         # 事件绑定
         
@@ -610,6 +917,52 @@ def create_chat_interface():
         get_schema_btn.click(
             fn=app.get_schema_info,
             outputs=[schema_status, schema_display]
+        )
+        
+        # 表信息维护功能事件绑定
+        
+        # 表信息管理
+        load_table_btn.click(
+            fn=app.get_table_metadata_info,
+            inputs=[table_dropdown],
+            outputs=[table_business_name, table_description, table_business_meaning, table_category, table_status]
+        )
+        
+        save_table_btn.click(
+            fn=app.update_table_metadata_info,
+            inputs=[table_dropdown, table_business_name, table_description, table_business_meaning, table_category],
+            outputs=[table_status]
+        )
+        
+        # 字段信息管理
+        column_table_dropdown.change(
+            fn=app.get_table_columns,
+            inputs=[column_table_dropdown],
+            outputs=[column_dropdown]
+        )
+        
+        load_column_btn.click(
+            fn=app.get_column_metadata_info,
+            inputs=[column_table_dropdown, column_dropdown],
+            outputs=[column_business_name, column_description, column_business_meaning, column_data_examples, column_status]
+        )
+        
+        save_column_btn.click(
+            fn=app.update_column_metadata_info,
+            inputs=[column_table_dropdown, column_dropdown, column_business_name, column_description, column_business_meaning, column_data_examples],
+            outputs=[column_status]
+        )
+        
+        # 数据导入导出
+        export_btn.click(
+            fn=app.export_table_metadata,
+            outputs=[export_status, export_data]
+        )
+        
+        import_btn.click(
+            fn=app.import_table_metadata,
+            inputs=[import_data],
+            outputs=[import_status]
         )
         
         # 启动时的欢迎信息

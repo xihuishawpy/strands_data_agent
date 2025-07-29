@@ -1,0 +1,10 @@
+{
+  "dim_edd_budget": {
+    "table_name": "dim_edd_budget",
+    "business_name": "预算表",
+    "description": "",
+    "business_meaning": "",
+    "category": "财务预算",
+    "columns": {}
+  }
+}

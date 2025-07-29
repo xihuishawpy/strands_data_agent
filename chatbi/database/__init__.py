@@ -6,6 +6,7 @@
 from .connectors import DatabaseConnector, get_database_connector
 from .sql_executor import SQLExecutor, SQLResult, get_sql_executor
 from .schema_manager import SchemaManager, get_schema_manager
+from .table_metadata_manager import TableMetadataManager, get_table_metadata_manager
 
 __all__ = [
     "DatabaseConnector",
@@ -15,4 +16,6 @@ __all__ = [
     "get_sql_executor",
     "SchemaManager",
     "get_schema_manager",
+    "TableMetadataManager",
+    "get_table_metadata_manager",
 ] 

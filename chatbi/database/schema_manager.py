@@ -21,6 +21,7 @@ class SchemaManager:
         self.cache_file = Path(config.knowledge_base_path) / "schema_cache.json"
         self.cache_ttl = config.schema_cache_ttl
         self._schema_cache = {}
+        self._metadata_manager = None  # 延迟初始化避免循环导入
         self._load_cache()
     
     def get_all_tables(self, force_refresh: bool = False) -> List[str]:
@@ -196,7 +197,14 @@ class SchemaManager:
                     rel_desc = f"  - {rel['from_table']}.{rel['from_column']} -> {rel['to_table']}.{rel['to_column']}"
                     summary_parts.append(rel_desc)
             
-            return "\n".join(summary_parts)
+            base_summary = "\n".join(summary_parts)
+            
+            # 使用表元数据管理器增强Schema摘要
+            if self._metadata_manager is None:
+                from .table_metadata_manager import get_table_metadata_manager
+                self._metadata_manager = get_table_metadata_manager()
+            
+            return self._metadata_manager.get_enhanced_schema_summary(base_summary)
             
         except Exception as e:
             logger.error(f"生成Schema摘要失败: {str(e)}")
