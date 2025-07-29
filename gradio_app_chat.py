@@ -52,120 +52,74 @@ class ChatBIApp:
             return False, error_msg
     
     def chat_query(self, message: str, history: List, auto_viz: bool = True, analysis_level: str = "standard"):
-        """处理对话式查询"""
+        """处理对话式查询 - 支持流式输出"""
         if not message.strip():
             history.append([message, "❌ 请输入有效的查询问题"])
-            return history, "", None
+            yield history, "", None
+            return
         
         try:
             if not self.orchestrator:
                 history.append([message, "❌ 系统未初始化，请检查配置"])
-                return history, "", None
+                yield history, "", None
+                return
             
-            # 执行查询
-            result = self.orchestrator.query(
+            # 初始化流式响应
+            current_response = "🤖 **正在处理您的查询...**\n\n"
+            history.append([message, current_response])
+            yield history, "", None
+            
+            # 步骤1: 获取Schema信息
+            current_response += "📋 **步骤1**: 正在获取数据库Schema信息...\n"
+            history[-1][1] = current_response
+            yield history, "", None
+            
+            # 执行查询 - 使用流式版本
+            for step_update in self.orchestrator.query_stream(
                 question=message,
                 auto_visualize=auto_viz,
                 analysis_level=analysis_level
-            )
+            ):
+                # 更新当前响应
+                if step_update.get('step_info'):
+                    current_response += step_update['step_info'] + "\n"
+                    history[-1][1] = current_response
+                    yield history, "", None
+                
+                # 如果是最终结果
+                if step_update.get('final_result'):
+                    result = step_update['final_result']
+                    break
+            else:
+                # 如果没有最终结果，说明出错了
+                current_response += "❌ **查询过程中断**\n"
+                history[-1][1] = current_response
+                yield history, "", None
+                return
             
             if not result.success:
                 error_response = f"❌ 查询失败\n\n**错误信息**: {result.error}"
-                history.append([message, error_response])
-                return history, "", None
+                current_response += error_response
+                history[-1][1] = current_response
+                yield history, "", None
+                return
             
-            # 构建对话式回复
-            response_parts = []
+            # 构建最终的完整回复
+            final_response = self._build_complete_response(result, auto_viz)
             
-            # 1. 查询摘要
-            metadata = result.metadata or {}
-            response_parts.append(f"✅ **查询完成** (耗时: {result.execution_time:.2f}秒)")
-            response_parts.append(f"📊 获得 **{metadata.get('row_count', 0)}** 行数据")
-            response_parts.append("")
+            # 更新历史记录为最终完整回复
+            history[-1][1] = final_response
             
-            # 2. SQL查询展示
-            if result.sql_query:
-                response_parts.append("### 🔧 生成的SQL查询")
-                response_parts.append(f"```sql\n{result.sql_query}\n```")
-                
-                # 显示涉及的表
-                if metadata.get('schema_tables_used'):
-                    tables_used = metadata['schema_tables_used']
-                    response_parts.append(f"**涉及的表**: {', '.join(tables_used)}")
-                response_parts.append("")
-            
-            # 3. 数据结果预览
+            # 准备图表数据
             chart_data = None
             if result.data and len(result.data) > 0:
                 df = pd.DataFrame(result.data)
+                metadata = result.metadata or {}
                 
-                response_parts.append("### 📊 数据结果")
-                response_parts.append(f"**字段**: {', '.join(df.columns)}")
-                
-                # 数据预览（前5行）
-                display_df = df.head(5)
-                formatted_df = display_df.copy()
-                for col in formatted_df.columns:
-                    if formatted_df[col].dtype in ['int64', 'float64']:
-                        formatted_df[col] = formatted_df[col].apply(self._format_number)
-                
-                response_parts.append("\n**数据预览**:")
-                response_parts.append(formatted_df.to_markdown(index=False))
-                
-                if len(df) > 5:
-                    response_parts.append(f"\n*显示前5行，总共{len(df)}行*")
-                response_parts.append("")
-                
-                # 准备图表数据
                 if auto_viz and result.chart_info and result.chart_info.get('success'):
                     chart_data = self._create_plotly_chart(df, result.chart_info)
                 elif auto_viz and metadata.get('visualization_suggestion'):
                     chart_data = self._create_chart_from_suggestion(df, metadata['visualization_suggestion'])
-            else:
-                # 处理无数据的情况
-                response_parts.append("### 📊 数据结果")
-                response_parts.append("⚠️ **查询执行成功，但未返回任何数据**")
-                response_parts.append("")
-                response_parts.append("**可能的原因**:")
-                response_parts.append("- 查询条件过于严格，没有匹配的记录")
-                response_parts.append("- 相关表中暂无数据")
-                response_parts.append("- JOIN条件可能需要调整")
-                response_parts.append("")
-                response_parts.append("**建议**:")
-                response_parts.append("- 尝试放宽查询条件")
-                response_parts.append("- 检查表中是否有数据")
-                response_parts.append("- 询问具体的表结构和数据情况")
-                response_parts.append("")
-            
-            # 4. 智能分析
-            if result.analysis:
-                response_parts.append("### 🔍 智能分析")
-                response_parts.append(result.analysis)
-                response_parts.append("")
-            
-            # 5. 可视化说明
-            if auto_viz:
-                viz_suggestion = metadata.get('visualization_suggestion') or {}
-                chart_type = viz_suggestion.get('chart_type', 'none') if viz_suggestion else 'none'
-                
-                if chart_type != 'none' and result.data and len(result.data) > 0:
-                    response_parts.append("### 🎨 数据可视化")
-                    if chart_data:
-                        response_parts.append(f"✅ 已生成 **{chart_type}** 图表")
-                        if viz_suggestion.get('reason'):
-                            response_parts.append(f"**选择理由**: {viz_suggestion['reason']}")
-                    else:
-                        response_parts.append(f"⚠️ 建议使用 **{chart_type}** 图表，但生成失败")
-                elif result.data and len(result.data) > 0:
-                    response_parts.append("### 🎨 数据可视化")
-                    response_parts.append("ℹ️ 当前数据不适合可视化展示")
-                else:
-                    response_parts.append("### 🎨 数据可视化")
-                    response_parts.append("ℹ️ 无数据可视化")
-            
-            # 更新历史记录
-            full_response = "\n".join(response_parts)
-            history.append([message, full_response])
             
             # 添加到内部历史
             self.chat_history.append({
@@ -175,7 +129,7 @@ class ChatBIApp:
                 "rows": len(result.data) if result.data and isinstance(result.data, list) else 0
             })
             
-            return history, "", chart_data
+            yield history, "", chart_data
             
         except Exception as e:
             error_response = f"❌ **系统错误**\n\n```\n{str(e)}\n```"
@@ -288,6 +242,91 @@ class ChatBIApp:
             print(f"自动选择列失败: {e}")
             return None, None
     
+    def _build_complete_response(self, result, auto_viz: bool) -> str:
+        """构建完整的对话回复"""
+        response_parts = []
+        
+        # 1. 查询摘要
+        metadata = result.metadata or {}
+        response_parts.append(f"✅ **查询完成** (耗时: {result.execution_time:.2f}秒)")
+        response_parts.append(f"📊 获得 **{metadata.get('row_count', 0)}** 行数据")
+        response_parts.append("")
+        
+        # 2. SQL查询展示
+        if result.sql_query:
+            response_parts.append("### 🔧 生成的SQL查询")
+            response_parts.append(f"```sql\n{result.sql_query}\n```")
+            
+            # 显示涉及的表
+            if metadata.get('schema_tables_used'):
+                tables_used = metadata['schema_tables_used']
+                response_parts.append(f"**涉及的表**: {', '.join(tables_used)}")
+            response_parts.append("")
+        
+        # 3. 数据结果预览
+        if result.data and len(result.data) > 0:
+            df = pd.DataFrame(result.data)
+            
+            response_parts.append("### 📊 数据结果")
+            response_parts.append(f"**字段**: {', '.join(df.columns)}")
+            
+            # 数据预览（前5行）
+            display_df = df.head(5)
+            formatted_df = display_df.copy()
+            for col in formatted_df.columns:
+                if formatted_df[col].dtype in ['int64', 'float64']:
+                    formatted_df[col] = formatted_df[col].apply(self._format_number)
+            
+            response_parts.append("\n**数据预览**:")
+            response_parts.append(formatted_df.to_markdown(index=False))
+            
+            if len(df) > 5:
+                response_parts.append(f"\n*显示前5行，总共{len(df)}行*")
+            response_parts.append("")
+        else:
+            # 处理无数据的情况
+            response_parts.append("### 📊 数据结果")
+            response_parts.append("⚠️ **查询执行成功，但未返回任何数据**")
+            response_parts.append("")
+            response_parts.append("**可能的原因**:")
+            response_parts.append("- 查询条件过于严格，没有匹配的记录")
+            response_parts.append("- 相关表中暂无数据")
+            response_parts.append("- JOIN条件可能需要调整")
+            response_parts.append("")
+            response_parts.append("**建议**:")
+            response_parts.append("- 尝试放宽查询条件")
+            response_parts.append("- 检查表中是否有数据")
+            response_parts.append("- 询问具体的表结构和数据情况")
+            response_parts.append("")
+        
+        # 4. 智能分析
+        if result.analysis:
+            response_parts.append("### 🔍 智能分析")
+            response_parts.append(result.analysis)
+            response_parts.append("")
+        
+        # 5. 可视化说明
+        if auto_viz:
+            viz_suggestion = metadata.get('visualization_suggestion') or {}
+            chart_type = viz_suggestion.get('chart_type', 'none') if viz_suggestion else 'none'
+            
+            if chart_type != 'none' and result.data and len(result.data) > 0:
+                response_parts.append("### 🎨 数据可视化")
+                if result.chart_info and result.chart_info.get("success"):
+                    response_parts.append(f"✅ 已生成 **{chart_type}** 图表")
+                    if viz_suggestion.get('reason'):
+                        response_parts.append(f"**选择理由**: {viz_suggestion['reason']}")
+                else:
+                    response_parts.append(f"⚠️ 建议使用 **{chart_type}** 图表，但生成失败")
+            elif result.data and len(result.data) > 0:
+                response_parts.append("### 🎨 数据可视化")
+                response_parts.append("ℹ️ 当前数据不适合可视化展示")
+            else:
+                response_parts.append("### 🎨 数据可视化")
+                response_parts.append("ℹ️ 无数据可视化")
+        
+        return "\n".join(response_parts)
+
     def _format_number(self, value):
         """格式化数字显示"""
         try:
@@ -525,25 +564,15 @@ def create_chat_interface():
         
         # 事件绑定
         
-        # 对话功能
-        def respond(message, history, auto_viz, analysis_level):
-            try:
-                updated_history, cleared_input, chart = app.chat_query(message, history, auto_viz, analysis_level)
-                return updated_history, "", chart  # 返回更新的历史、清空输入框、图表
-            except Exception as e:
-                # 处理异常情况
-                error_msg = f"❌ 处理错误: {str(e)}"
-                history.append([message, error_msg])
-                return history, "", None
-        
+        # 对话功能 - 支持流式输出
         msg_input.submit(
-            respond,
+            app.chat_query,
             inputs=[msg_input, chatbot, auto_viz, analysis_level],
             outputs=[chatbot, msg_input, chart_display]
         )
         
         send_btn.click(
-            respond,
+            app.chat_query,
             inputs=[msg_input, chatbot, auto_viz, analysis_level],
             outputs=[chatbot, msg_input, chart_display]
         )
@@ -556,7 +585,10 @@ def create_chat_interface():
         
         # 示例按钮
         def handle_example(example_text):
-            return respond(example_text, [], True, "standard")
+            # 直接调用chat_query生成器，取最后一个结果
+            for result in app.chat_query(example_text, [], True, "standard"):
+                final_result = result
+            return final_result
         
         for i, btn in enumerate(example_btns):
             btn.click(

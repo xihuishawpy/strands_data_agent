@@ -47,6 +47,115 @@ class ChatBIOrchestrator:
         
         logger.info("ChatBI主控智能体初始化完成")
     
+    def query_stream(self, 
+                    question: str, 
+                    auto_visualize: bool = True,
+                    analysis_level: str = "standard"):
+        """
+        流式智能查询流程 - 实时返回处理进度
+        
+        Yields:
+            Dict: 包含step_info或final_result的字典
+        """
+        start_time = time.time()
+        
+        try:
+            logger.info(f"🚀 开始流式智能查询流程: {question}")
+            
+            # ===== 步骤1: 获取数据库Schema信息 =====
+            yield {"step_info": "✅ **步骤1完成**: Schema信息获取成功"}
+            
+            schema_info = self._get_relevant_schema(question)
+            if not schema_info:
+                yield {"final_result": self._create_error_result(
+                    question, "无法获取数据库Schema信息", start_time
+                )}
+                return
+            
+            # ===== 步骤2: 生成SQL查询 =====
+            yield {"step_info": "🔧 **步骤2**: 正在生成SQL查询..."}
+            
+            sql_query = self._generate_sql(question, schema_info)
+            
+            if sql_query.startswith("ERROR"):
+                yield {"final_result": self._create_error_result(
+                    question, f"SQL生成失败: {sql_query}", start_time
+                )}
+                return
+            
+            yield {"step_info": f"✅ **步骤2完成**: SQL查询生成成功\n```sql\n{sql_query[:200]}{'...' if len(sql_query) > 200 else ''}\n```"}
+            
+            # ===== 步骤3: 执行SQL查询 =====
+            yield {"step_info": "⚡ **步骤3**: 正在执行SQL查询..."}
+            
+            sql_result, final_sql = self._execute_sql_with_retry(sql_query, schema_info, question)
+            
+            if not sql_result.success:
+                yield {"final_result": self._create_error_result(
+                    question, f"SQL执行失败: {sql_result.error}", start_time, final_sql or sql_query
+                )}
+                return
+            
+            sql_query = final_sql or sql_query
+            yield {"step_info": f"✅ **步骤3完成**: 查询执行成功，获得 **{sql_result.row_count}** 行数据"}
+            
+            # ===== 步骤4: 数据分析 =====
+            analysis = None
+            visualization_suggestion = None
+            
+            if analysis_level != "none" and sql_result.data:
+                yield {"step_info": "🔍 **步骤4**: 正在进行智能数据分析..."}
+                
+                analysis = self._analyze_data(question, sql_query, sql_result, analysis_level)
+                yield {"step_info": "✅ **步骤4完成**: 数据分析完成"}
+                
+                # 获取可视化建议
+                if auto_visualize:
+                    yield {"step_info": "🎨 **步骤5**: 正在生成可视化建议..."}
+                    visualization_suggestion = self._get_visualization_suggestion(sql_result, question)
+                    chart_type = visualization_suggestion.get('chart_type', 'none')
+                    yield {"step_info": f"✅ **步骤5完成**: 建议使用 **{chart_type}** 图表"}
+            
+            # ===== 步骤6: 创建可视化 =====
+            chart_info = None
+            if auto_visualize and sql_result.data and visualization_suggestion:
+                yield {"step_info": "🎯 **步骤6**: 正在创建数据可视化..."}
+                
+                chart_info = self._create_chart_from_suggestion(sql_result, visualization_suggestion)
+                
+                if chart_info and chart_info.get("success"):
+                    yield {"step_info": "✅ **步骤6完成**: 可视化图表创建成功"}
+                else:
+                    yield {"step_info": "⚠️ **步骤6**: 可视化创建失败或跳过"}
+            
+            execution_time = time.time() - start_time
+            yield {"step_info": f"🎉 **查询完成**: 总耗时 {execution_time:.2f}秒"}
+            
+            # 返回最终结果
+            result = QueryResult(
+                success=True,
+                question=question,
+                sql_query=sql_query,
+                data=sql_result.data,
+                analysis=analysis,
+                chart_info=chart_info,
+                execution_time=execution_time,
+                metadata={
+                    "row_count": sql_result.row_count,
+                    "columns": sql_result.columns,
+                    "schema_tables_used": self._extract_tables_from_sql(sql_query),
+                    "visualization_suggestion": visualization_suggestion
+                }
+            )
+            
+            yield {"final_result": result}
+            
+        except Exception as e:
+            logger.error(f"❌ 流式查询流程失败: {str(e)}")
+            yield {"final_result": self._create_error_result(
+                question, f"系统错误: {str(e)}", start_time
+            )}
+
     def query(self, 
              question: str, 
              auto_visualize: bool = True,
