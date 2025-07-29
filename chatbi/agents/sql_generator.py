@@ -24,7 +24,7 @@ class SQLGeneratorAgent(BaseAgent):
 1. **只输出SQL查询语句**，不要包含任何解释、注释或其他文字
 2. **只允许SELECT查询**，绝对不能包含INSERT、UPDATE、DELETE、DROP等危险操作
 3. **基于提供的数据库Schema**来构建查询，确保表名和字段名准确
-4. **使用标准SQL语法**，兼容PostgreSQL、MySQL和SQLite
+4. **使用标准SQL语法**，兼容PostgreSQL、MySQL
 5. 如果无法根据Schema生成合适的查询，输出: `ERROR_CANNOT_GENERATE`
 
 ## SQL最佳实践
