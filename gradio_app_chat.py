@@ -37,6 +37,7 @@ class ChatBIApp:
         self.schema_manager = None
         self.metadata_manager = None
         self.chat_history = []
+        self.last_query_result = None  # 存储最后一次查询结果，用于反馈
         
         # 尝试初始化组件
         self._initialize_components()
@@ -53,7 +54,7 @@ class ChatBIApp:
             error_msg = f"❌ 系统初始化失败: {str(e)}"
             return False, error_msg
     
-    def chat_query(self, message: str, history: List, auto_viz: bool = True, analysis_level: str = "standard"):
+    def chat_query(self, message: str, history: List, auto_viz: bool = True, enable_analysis: bool = True, analysis_level: str = "standard"):
         """处理对话式查询 - 支持流式输出"""
         if not message.strip():
             history.append([message, "❌ 请输入有效的查询问题"])
@@ -77,10 +78,11 @@ class ChatBIApp:
             yield history, "", None
             
             # 执行查询 - 使用流式版本
+            final_analysis_level = analysis_level if enable_analysis else "none"
             for step_update in self.orchestrator.query_stream(
                 question=message,
                 auto_visualize=auto_viz,
-                analysis_level=analysis_level
+                analysis_level=final_analysis_level
             ):
                 # 更新当前响应
                 if step_update.get('step_info'):
@@ -122,6 +124,9 @@ class ChatBIApp:
                     chart_data = self._create_plotly_chart(df, result.chart_info)
                 elif auto_viz and metadata.get('visualization_suggestion'):
                     chart_data = self._create_chart_from_suggestion(df, metadata['visualization_suggestion'])
+            
+            # 保存查询结果用于反馈
+            self.last_query_result = result
             
             # 添加到内部历史
             self.chat_history.append({
@@ -272,8 +277,8 @@ class ChatBIApp:
             response_parts.append("### 📊 数据结果")
             response_parts.append(f"**字段**: {', '.join(df.columns)}")
             
-            # 数据预览（前5行）
-            display_df = df.head(5)
+            # 数据预览
+            display_df = df.head(50)
             formatted_df = display_df.copy()
             for col in formatted_df.columns:
                 if formatted_df[col].dtype in ['int64', 'float64']:
@@ -282,8 +287,8 @@ class ChatBIApp:
             response_parts.append("\n**数据预览**:")
             response_parts.append(formatted_df.to_markdown(index=False))
             
-            if len(df) > 5:
-                response_parts.append(f"\n*显示前5行，总共{len(df)}行*")
+            if len(df) > 50:
+                response_parts.append(f"\n*显示前50行，总共{len(df)}行*")
             response_parts.append("")
         else:
             # 处理无数据的情况
@@ -358,6 +363,74 @@ class ChatBIApp:
                 
         except (ValueError, TypeError):
             return str(value)
+    
+    def add_positive_feedback(self, description: str = "") -> str:
+        """添加正面反馈到知识库"""
+        if not self.last_query_result or not self.last_query_result.success:
+            return "❌ 没有可反馈的查询结果"
+        
+        try:
+            success = self.orchestrator.add_positive_feedback(
+                question=self.last_query_result.question,
+                sql=self.last_query_result.sql_query,
+                description=description or "用户点赞的高质量查询"
+            )
+            
+            if success:
+                return "✅ 感谢反馈！已将此查询添加到知识库，将帮助改进未来的查询生成"
+            else:
+                return "⚠️ 反馈添加失败，可能是知识库未启用"
+        
+        except Exception as e:
+            return f"❌ 反馈添加失败: {str(e)}"
+    
+    def get_knowledge_stats(self) -> str:
+        """获取知识库统计信息"""
+        try:
+            stats = self.orchestrator.get_knowledge_stats()
+            
+            if stats.get("enabled"):
+                return f"""
+### 📊 SQL知识库统计
+
+- **总条目数**: {stats.get('total_items', 0)}
+- **平均评分**: {stats.get('avg_rating', 0):.2f}
+- **总使用次数**: {stats.get('total_usage', 0)}
+- **高评分条目**: {stats.get('top_rated_count', 0)}
+- **集合名称**: {stats.get('collection_name', 'N/A')}
+- **状态**: ✅ 启用
+
+### 💡 知识库说明
+知识库通过收集用户反馈的高质量查询，使用RAG技术提升SQL生成的准确性和一致性。当您对查询结果满意时，请点击"👍 添加到知识库"按钮。
+
+### 🔄 RAG工作流程
+1. **智能检索**: 用户提问时，系统首先搜索知识库中的相似问题
+2. **相似度判断**: 计算问题间的语义相似度
+3. **策略选择**: 
+   - 高相似度(>0.8): 直接使用缓存SQL
+   - 中相似度(0.6-0.8): 使用相似示例辅助生成
+   - 低相似度(<0.6): 常规生成流程
+4. **持续学习**: 用户点赞的查询自动加入知识库
+                """
+            else:
+                return f"""
+### ❌ SQL知识库未启用
+
+**原因**: {stats.get('reason', '未知原因')}
+
+### 🔧 启用方法
+1. 安装依赖: `pip install chromadb sentence-transformers`
+2. 设置API密钥: 确保DASHSCOPE_API_KEY已配置
+3. 重启应用
+
+### 📚 功能说明
+SQL知识库是ChatBI的核心功能之一，通过RAG技术：
+- 🧠 智能检索匹配历史查询
+- 👍 收集用户反馈持续改进
+- 🚀 提升SQL生成准确性和一致性
+                """
+        except Exception as e:
+            return f"❌ 获取知识库统计失败: {str(e)}"
     
     # 系统管理功能
     def test_connection(self) -> Tuple[str, str]:
@@ -883,6 +956,31 @@ def create_chat_interface():
         margin: 8px 0;
         background-color: #f8f9fa;
     }
+    .input-row {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        padding: 16px;
+        margin: 8px 0;
+    }
+    .options-panel {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .feedback-panel {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+    }
+    .chart-panel {
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 16px;
+        background: #fafafa;
+    }
     """
     
     with gr.Blocks(title="ChatBI 智能对话查询", css=css, theme=gr.themes.Soft()) as interface:
@@ -907,52 +1005,138 @@ def create_chat_interface():
                             bubble_full_width=False
                         )
                         
-                        with gr.Row():
-                            msg_input = gr.Textbox(
-                                label="输入您的问题",
-                                placeholder="例如：显示销售额最高的前10个区域",
-                                lines=2,
-                                scale=4
-                            )
-                            send_btn = gr.Button("发送", variant="primary", scale=1)
+                        # 输入区域
+                        with gr.Group(elem_classes="input-row"):
+                            with gr.Row():
+                                msg_input = gr.Textbox(
+                                    label="输入您的问题",
+                                    placeholder="例如：显示销售额最高的前10个区域",
+                                    lines=2,
+                                    scale=4,
+                                    show_label=False
+                                )
+                                with gr.Column(scale=1):
+                                    send_btn = gr.Button("🚀 发送", variant="primary", size="lg")
+                                    clear_btn = gr.Button("🗑️ 清空对话", variant="secondary", size="sm")
                         
-                        # 查询选项
-                        with gr.Row():
-                            auto_viz = gr.Checkbox(label="自动可视化", value=True)
-                            analysis_level = gr.Dropdown(
-                                label="分析级别",
-                                choices=["basic", "standard", "detailed"],
-                                value="standard"
-                            )
-                            clear_btn = gr.Button("清空对话", variant="secondary")
+                        # 查询选项面板
+                        with gr.Group(elem_classes="options-panel"):
+                            gr.Markdown("### ⚙️ 查询选项")
+                            with gr.Row():
+                                auto_viz = gr.Checkbox(
+                                    label="📊 自动可视化", 
+                                    value=True,
+                                    info="自动为查询结果生成图表"
+                                )
+                                enable_analysis = gr.Checkbox(
+                                    label="🧠 智能分析", 
+                                    value=True,
+                                    info="对查询结果进行AI分析"
+                                )
+                            with gr.Row():
+                                analysis_level = gr.Dropdown(
+                                    label="分析级别",
+                                    choices=[
+                                        ("基础分析", "basic"), 
+                                        ("标准分析", "standard"), 
+                                        ("详细分析", "detailed")
+                                    ],
+                                    value="standard",
+                                    info="选择数据分析的详细程度"
+                                )
+                        
+                        # 反馈区域
+                        with gr.Group(elem_classes="feedback-panel"):
+                            gr.Markdown("### 💝 查询反馈")
+                            with gr.Row():
+                                with gr.Column(scale=3):
+                                    feedback_description = gr.Textbox(
+                                        label="反馈描述",
+                                        placeholder="描述这个查询的用途或特点...",
+                                        lines=1,
+                                        show_label=False
+                                    )
+                                with gr.Column(scale=1):
+                                    like_btn = gr.Button("👍 添加到知识库", variant="secondary", size="sm")
+                            
+                            feedback_result = gr.Markdown("", visible=False)
                     
                     with gr.Column(scale=2):
                         # 可视化展示区域
-                        gr.Markdown("### 📊 数据可视化")
-                        chart_display = gr.Plot(
-                            label="图表",
-                            show_label=False,
-                            container=True
-                        )
+                        with gr.Group(elem_classes="chart-panel"):
+                            gr.Markdown("### 📊 数据可视化")
+                            chart_display = gr.Plot(
+                                label="图表",
+                                show_label=False,
+                                container=True
+                            )
                         
                         # 快速查询示例
+                        with gr.Group():
+                            gr.Markdown("### 💡 快速查询示例")
+                            
+                            example_btns = []
+                            examples = [
+                                "📊 显示所有表的记录数",
+                                "🌍 按地区统计销售总额", 
+                                "🏆 销售额最高的前10个客户",
+                                "📈 最近一个月的销售趋势",
+                                "👥 统计活跃用户数量",
+                                "💰 查询今日销售额"
+                            ]
+                            
+                            # 分两列显示示例按钮
+                            with gr.Row():
+                                with gr.Column():
+                                    for i in range(0, len(examples), 2):
+                                        btn = gr.Button(
+                                            examples[i], 
+                                            variant="outline", 
+                                            size="sm",
+                                            scale=1
+                                        )
+                                        example_btns.append(btn)
+                                with gr.Column():
+                                    for i in range(1, len(examples), 2):
+                                        btn = gr.Button(
+                                            examples[i], 
+                                            variant="outline", 
+                                            size="sm",
+                                            scale=1
+                                        )
+                                        example_btns.append(btn)
+            
+            # SQL知识库界面
+            with gr.TabItem("� SQL知识,库", elem_id="knowledge-tab"):
+                gr.Markdown("""
+                ## 🧠 SQL知识库管理
+                
+                通过RAG技术提升SQL生成的准确性和一致性。
+                """)
+                
+                with gr.Row():
+                    with gr.Column():
+                        # 知识库统计
+                        gr.Markdown("### 📊 知识库统计")
+                        refresh_stats_btn = gr.Button("刷新统计", variant="secondary")
+                        knowledge_stats = gr.Markdown("点击'刷新统计'查看知识库状态")
+                        
+                        # 使用说明
                         gr.Markdown("""
-                        ### 💡 查询示例
+                        ### 💡 使用说明
                         
-                        点击下方示例快速开始：
+                        **如何使用知识库功能：**
+                        1. 在对话界面进行查询
+                        2. 如果结果满意，点击"👍 添加到知识库"按钮
+                        3. 可选择添加描述信息，帮助系统更好地理解查询用途
+                        4. 系统会自动学习，提升后续相似查询的准确性
+                        
+                        **RAG工作原理：**
+                        - 🔍 **智能检索**: 自动搜索相似的历史查询
+                        - 🎯 **策略选择**: 根据相似度选择最佳生成策略
+                        - 📈 **持续改进**: 基于用户反馈不断优化
+                        - 🚀 **性能提升**: 减少重复生成，提高响应速度
                         """)
-                        
-                        example_btns = []
-                        examples = [
-                            "显示所有表的记录数",
-                            "按地区统计销售总额", 
-                            "销售额最高的前10个客户",
-                            "最近一个月的销售趋势"
-                        ]
-                        
-                        for example in examples:
-                            btn = gr.Button(example, variant="secondary", size="sm")
-                            example_btns.append(btn)
             
             # 系统管理界面
             with gr.TabItem("🔧 系统管理", elem_id="system-tab"):
@@ -1113,13 +1297,13 @@ def create_chat_interface():
         # 对话功能 - 支持流式输出
         msg_input.submit(
             app.chat_query,
-            inputs=[msg_input, chatbot, auto_viz, analysis_level],
+            inputs=[msg_input, chatbot, auto_viz, enable_analysis, analysis_level],
             outputs=[chatbot, msg_input, chart_display]
         )
         
         send_btn.click(
             app.chat_query,
-            inputs=[msg_input, chatbot, auto_viz, analysis_level],
+            inputs=[msg_input, chatbot, auto_viz, enable_analysis, analysis_level],
             outputs=[chatbot, msg_input, chart_display]
         )
         
@@ -1129,10 +1313,21 @@ def create_chat_interface():
             outputs=[chatbot, chart_display]
         )
         
+        # 反馈功能
+        def handle_feedback(description):
+            result = app.add_positive_feedback(description)
+            return result, gr.update(visible=True), ""  # 清空描述框
+        
+        like_btn.click(
+            fn=handle_feedback,
+            inputs=[feedback_description],
+            outputs=[feedback_result, feedback_result, feedback_description]
+        )
+        
         # 示例按钮
         def handle_example(example_text):
             # 直接调用chat_query生成器，取最后一个结果
-            for result in app.chat_query(example_text, [], True, "standard"):
+            for result in app.chat_query(example_text, [], True, True, "standard"):
                 final_result = result
             return final_result
         
@@ -1156,6 +1351,12 @@ def create_chat_interface():
         get_schema_btn.click(
             fn=app.get_schema_info,
             outputs=[schema_status, schema_display]
+        )
+        
+        # 知识库功能
+        refresh_stats_btn.click(
+            fn=app.get_knowledge_stats,
+            outputs=[knowledge_stats]
         )
         
         # 表信息维护功能事件绑定
@@ -1205,14 +1406,28 @@ def create_chat_interface():
             outputs=[import_status]
         )
         
-        # 启动时的欢迎信息
+        # 启动时的欢迎信息和知识库统计
         def load_welcome():
-            welcome_msg = "👋 您好！我是ChatBI智能助手。\n\n我可以帮您：\n- 🔍 用自然语言查询数据库\n- 📊 自动生成SQL和执行查询\n- 🎨 创建数据可视化图表\n- 🔍 提供智能数据分析\n\n请输入您的问题开始对话！"
-            return [["", welcome_msg]], None
+            welcome_msg = """👋 您好！我是ChatBI智能助手。
+
+🚀 **核心功能**：
+- 🔍 **自然语言查询**: 用中文提问，自动生成SQL
+- 📊 **智能可视化**: 自动选择最适合的图表类型
+- 🧠 **AI数据分析**: 深度解读数据，提供业务洞察
+- 🎯 **RAG智能学习**: 基于用户反馈持续改进
+
+💡 **使用提示**：
+- 可在右侧选项面板中调整可视化和分析设置
+- 对满意的查询结果点赞，帮助AI学习改进
+- 点击下方示例按钮快速开始
+
+请输入您的问题开始智能对话！"""
+            stats = app.get_knowledge_stats()
+            return [["", welcome_msg]], None, stats
         
         interface.load(
             load_welcome,
-            outputs=[chatbot, chart_display]
+            outputs=[chatbot, chart_display, knowledge_stats]
         )
     
     return interface

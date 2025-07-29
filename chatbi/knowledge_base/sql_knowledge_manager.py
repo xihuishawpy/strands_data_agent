@@ -42,8 +42,8 @@ class SQLKnowledgeManager:
     
     def search_knowledge(self, 
                         question: str,
-                        similarity_threshold: float = 0.6,  # 降低阈值
-                        confidence_threshold: float = 0.8) -> RAGResult:
+                        similarity_threshold: float = None,
+                        confidence_threshold: float = None) -> RAGResult:
         """
         搜索SQL知识库
         
@@ -57,6 +57,13 @@ class SQLKnowledgeManager:
         """
         if not self.enabled or not self.vector_store:
             return RAGResult(found_match=False)
+        
+        # 使用配置文件中的默认值
+        from ..config import config
+        if similarity_threshold is None:
+            similarity_threshold = config.rag_similarity_threshold
+        if confidence_threshold is None:
+            confidence_threshold = config.rag_confidence_threshold
         
         try:
             # 搜索相似问题
@@ -74,13 +81,22 @@ class SQLKnowledgeManager:
             best_match = similar_items[0]
             confidence = best_match["similarity"]
             
-            # 决定是否直接使用缓存的SQL
-            should_use_cached = (
-                confidence >= confidence_threshold and 
-                best_match["rating"] > 0  # 必须是被点赞过的
-            )
-            
-            logger.info(f"找到相似SQL知识，最高相似度: {confidence:.3f}, 是否使用缓存: {should_use_cached}")
+            # 策略选择逻辑
+            if confidence >= confidence_threshold and best_match["rating"] > 0:
+                # 高相似度策略：直接使用缓存SQL
+                should_use_cached = True
+                strategy = "high_similarity_cached"
+                logger.info(f"🎯 高相似度策略 (相似度: {confidence:.3f} >= {confidence_threshold}): 直接使用缓存SQL")
+            elif confidence >= (similarity_threshold + confidence_threshold) / 2:
+                # 中相似度策略：使用相似示例辅助生成
+                should_use_cached = False
+                strategy = "medium_similarity_assisted"
+                logger.info(f"🔍 中相似度策略 (相似度: {confidence:.3f}): 使用相似示例辅助生成")
+            else:
+                # 低相似度策略：常规生成流程（但仍提供示例）
+                should_use_cached = False
+                strategy = "low_similarity_normal"
+                logger.info(f"📝 低相似度策略 (相似度: {confidence:.3f}): 常规生成流程")
             
             return RAGResult(
                 found_match=True,

@@ -85,6 +85,9 @@ python test_complete_flow.py
 # 测试SQL知识库功能
 python test_sql_knowledge_base.py
 
+# 测试对话式界面RAG集成
+python test_chat_ui_rag.py
+
 # 演示SQL知识库完整工作流程
 python demo_sql_knowledge_base.py
 ```
@@ -94,16 +97,16 @@ python demo_sql_knowledge_base.py
 ```bash
 # 启动界面选择器 (推荐)
 python start_gradio.py
-# 选择 1: 对话式界面 (人机交互体验)
-# 选择 2: 传统界面 (多标签页功能)
+# 选择 1: 对话式界面 (人机交互体验 + RAG功能)
+# 选择 2: 传统界面 (多标签页功能 + RAG功能)
 
-# 直接启动对话式界面
+# 直接启动对话式界面 (已集成RAG功能)
 python start_chat_ui.py
 
-# 直接启动传统界面
+# 直接启动传统界面 (已集成RAG功能)
 python gradio_app.py
 
-# 启动带反馈功能的界面 (推荐)
+# 启动专门的反馈功能演示界面
 python gradio_app_with_feedback.py
 
 # 使用命令行接口
@@ -112,7 +115,10 @@ python cli.py "统计每个表的记录数"
 
 #### 界面选择指南
 
-- **💬 对话式界面**: 适合日常查询，一次对话获得SQL、数据、分析、图表的完整回答
+- **💬 对话式界面**: 
+  - 适合日常查询，一次对话获得SQL、数据、分析、图表的完整回答
+  - ✨ **新增功能**: 智能分析开关、美化UI、优化布局
+  - 🎯 支持RAG智能学习和用户反馈
 - **📋 传统界面**: 适合精细控制，提供SQL优化、详细配置等高级功能
 
 ### 5. 完整查询流程

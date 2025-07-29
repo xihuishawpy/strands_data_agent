@@ -119,14 +119,14 @@ class SQLGeneratorAgent(BaseAgent):
         if not is_valid:
             return f"ERROR_INVALID_INPUT: {error_msg}"
         
-        # 第一步：尝试从知识库检索
+        # RAG策略：尝试从知识库检索
         if use_rag and self.knowledge_manager.enabled:
             rag_result = self.knowledge_manager.search_knowledge(question)
             
             if rag_result.found_match and rag_result.should_use_cached:
-                # 直接使用缓存的SQL
+                # 策略1：高相似度 - 直接使用缓存的SQL
                 cached_sql = rag_result.best_match["sql"]
-                logger.info(f"🎯 使用RAG缓存SQL (相似度: {rag_result.confidence:.3f}): {cached_sql}")
+                logger.info(f"🎯 RAG策略1-高相似度: 直接使用缓存SQL (相似度: {rag_result.confidence:.3f})")
                 
                 # 更新使用统计
                 self.knowledge_manager.update_usage_feedback(question, cached_sql, 0.1)
@@ -134,7 +134,7 @@ class SQLGeneratorAgent(BaseAgent):
                 return cached_sql
             
             elif rag_result.found_match:
-                # 使用相似示例辅助生成
+                # 策略2：中相似度 - 使用相似示例辅助生成
                 if not examples:
                     examples = []
                 
@@ -145,13 +145,15 @@ class SQLGeneratorAgent(BaseAgent):
                         "sql": similar_item["sql"]
                     })
                 
-                logger.info(f"🔍 使用RAG示例辅助生成 (找到 {len(rag_result.similar_examples or [])} 个相似示例)")
-        
-        # 第二步：如果没有直接匹配，获取知识库示例
-        if use_rag and self.knowledge_manager.enabled and not examples:
-            examples = self.knowledge_manager.get_examples_for_generation(question)
-            if examples:
-                logger.info(f"📚 从知识库获取 {len(examples)} 个生成示例")
+                logger.info(f"🔍 RAG策略2-中相似度: 使用 {len(rag_result.similar_examples or [])} 个相似示例辅助生成")
+            
+            else:
+                # 策略3：低相似度 - 常规生成流程（仍尝试获取一般示例）
+                examples = self.knowledge_manager.get_examples_for_generation(question, max_examples=2)
+                if examples:
+                    logger.info(f"📝 RAG策略3-低相似度: 使用 {len(examples)} 个一般示例辅助生成")
+                else:
+                    logger.info(f"📝 RAG策略3-低相似度: 常规生成流程（无相似示例）")
         
         # 构建上下文
         context = {

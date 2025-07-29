@@ -70,8 +70,8 @@ class Config:
         
         # RAG知识库配置
         self.rag_enabled = os.getenv("RAG_ENABLED", "true").lower() == "true"
-        self.rag_similarity_threshold = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.7"))
-        self.rag_confidence_threshold = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.85"))
+        self.rag_similarity_threshold = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.6"))  # 相似度阈值
+        self.rag_confidence_threshold = float(os.getenv("RAG_CONFIDENCE_THRESHOLD", "0.8"))  # 置信度阈值
         self.rag_max_examples = int(os.getenv("RAG_MAX_EXAMPLES", "3"))
         
         # 确保目录存在
