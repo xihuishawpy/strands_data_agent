@@ -304,6 +304,13 @@ class ChatBIOrchestrator:
                 current_time - self._last_schema_update > config.schema_cache_ttl):
                 self._schema_summary = self.schema_manager.get_schema_summary()
                 self._last_schema_update = current_time
+                
+                # 调试信息：打印完整的Schema摘要
+                logger.info("=" * 80)
+                logger.info("📋 完整Schema摘要（包含业务元数据）:")
+                logger.info("=" * 80)
+                logger.info(self._schema_summary)
+                logger.info("=" * 80)
             
             # 直接返回完整Schema摘要，不做关键词搜索
             return self._schema_summary

@@ -50,6 +50,19 @@ class BaseAgent(ABC):
             # 构建完整的提示
             user_prompt = self._build_prompt(query, context)
             
+            # 调试信息：打印发送给LLM的完整prompt
+            logger.info("=" * 100)
+            logger.info(f"🤖 智能体 {self.name} - 发送给LLM的完整Prompt:")
+            logger.info("=" * 100)
+            logger.info("📋 System Prompt:")
+            logger.info("-" * 50)
+            logger.info(self.system_prompt)
+            logger.info("-" * 50)
+            logger.info("👤 User Prompt:")
+            logger.info("-" * 50)
+            logger.info(user_prompt)
+            logger.info("=" * 100)
+            
             # 调用OpenAI兼容的API
             response = self.client.chat.completions.create(
                 model=self.model_name,
@@ -62,7 +75,8 @@ class BaseAgent(ABC):
             )
             
             result = response.choices[0].message.content
-            logger.debug(f"智能体 {self.name} 响应: {result}")
+            logger.info(f"🤖 智能体 {self.name} 响应: {result}")
+            logger.info("=" * 100)
             return result
             
         except Exception as e:
