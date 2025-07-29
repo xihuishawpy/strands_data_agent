@@ -150,42 +150,75 @@ class TableMetadataManager:
     def get_enhanced_schema_summary(self, base_schema: str) -> str:
         """获取增强的Schema摘要，包含用户自定义的业务信息"""
         try:
-            enhanced_parts = [base_schema, "\n=== 业务信息增强 ===\n"]
-            
+            # 检查是否有业务元数据需要增强
+            has_business_metadata = False
             for table_name, metadata in self._metadata_cache.items():
-                if not any([metadata.business_name, metadata.description, 
-                           metadata.business_meaning, metadata.category]):
-                    continue
-                
-                enhanced_parts.append(f"表: {table_name}")
-                
-                if metadata.business_name:
-                    enhanced_parts.append(f"  业务名称: {metadata.business_name}")
-                if metadata.description:
-                    enhanced_parts.append(f"  描述: {metadata.description}")
-                if metadata.business_meaning:
-                    enhanced_parts.append(f"  业务含义: {metadata.business_meaning}")
-                if metadata.category:
-                    enhanced_parts.append(f"  业务分类: {metadata.category}")
-                
-                # 字段业务信息
-                for col_name, col_metadata in metadata.columns.items():
-                    if not any([col_metadata.business_name, col_metadata.description,
-                               col_metadata.business_meaning, col_metadata.data_examples]):
-                        continue
-                    
-                    enhanced_parts.append(f"  字段 {col_name}:")
-                    if col_metadata.business_name:
-                        enhanced_parts.append(f"    业务名称: {col_metadata.business_name}")
-                    if col_metadata.description:
-                        enhanced_parts.append(f"    描述: {col_metadata.description}")
-                    if col_metadata.business_meaning:
-                        enhanced_parts.append(f"    业务含义: {col_metadata.business_meaning}")
-                    if col_metadata.data_examples:
-                        enhanced_parts.append(f"    数据示例: {', '.join(col_metadata.data_examples)}")
-                
-                enhanced_parts.append("")
+                if any([metadata.business_name, metadata.description, 
+                       metadata.business_meaning, metadata.category]):
+                    has_business_metadata = True
+                    break
+                for col_metadata in metadata.columns.values():
+                    if any([col_metadata.business_name, col_metadata.description,
+                           col_metadata.business_meaning, col_metadata.data_examples]):
+                        has_business_metadata = True
+                        break
+                if has_business_metadata:
+                    break
             
+            # 如果没有业务元数据，直接返回基础schema
+            if not has_business_metadata:
+                return base_schema
+            
+            # 重新构建完整的schema，将业务信息直接集成到基础schema中，避免重复
+            enhanced_parts = []
+            lines = base_schema.split('\n')
+            
+            current_table = None
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+                
+                # 检测表名行
+                if line.startswith('表名: '):
+                    current_table = line.replace('表名: ', '').strip()
+                    enhanced_parts.append(line)
+                    
+                    # 添加表级别的业务信息（紧跟在表名后面）
+                    if current_table in self._metadata_cache:
+                        metadata = self._metadata_cache[current_table]
+                        if metadata.business_name:
+                            enhanced_parts.append(f"  业务名称: {metadata.business_name}")
+                        if metadata.description:
+                            enhanced_parts.append(f"  描述: {metadata.description}")
+                        if metadata.business_meaning:
+                            enhanced_parts.append(f"  业务含义: {metadata.business_meaning}")
+                        if metadata.category:
+                            enhanced_parts.append(f"  业务分类: {metadata.category}")
+                
+                # 检测字段行并增强
+                elif line.startswith('- ') and current_table and current_table in self._metadata_cache:
+                    # 解析字段名
+                    field_part = line[2:].split(' ')[0]  # 去掉"- "前缀，取第一个单词作为字段名
+                    enhanced_parts.append(line)
+                    
+                    # 添加字段级别的业务信息（紧跟在字段后面）
+                    metadata = self._metadata_cache[current_table]
+                    if field_part in metadata.columns:
+                        col_metadata = metadata.columns[field_part]
+                        if col_metadata.business_name:
+                            enhanced_parts.append(f"    业务名称: {col_metadata.business_name}")
+                        if col_metadata.description:
+                            enhanced_parts.append(f"    描述: {col_metadata.description}")
+                        if col_metadata.business_meaning:
+                            enhanced_parts.append(f"    业务含义: {col_metadata.business_meaning}")
+                        if col_metadata.data_examples:
+                            enhanced_parts.append(f"    数据示例: {', '.join(col_metadata.data_examples)}")
+                else:
+                    enhanced_parts.append(line)
+                
+                i += 1
+            
+            # 不再添加单独的"=== 业务信息增强 ==="部分，因为已经集成到基础schema中了
             return "\n".join(enhanced_parts)
             
         except Exception as e:

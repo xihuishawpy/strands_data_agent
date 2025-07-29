@@ -1,0 +1,1 @@
+python -c "import logging; logging.basicConfig(level=logging.INFO); from chatbi.orchestrator import get_orchestrator; orch = get_orchestrator(); list(orch.query_stream('不同物料代码的预算总金额分布情况'))"

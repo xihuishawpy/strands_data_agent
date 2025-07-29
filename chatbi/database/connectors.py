@@ -326,6 +326,54 @@ class MySQLConnector(DatabaseConnector):
         except SQLAlchemyError as e:
             logger.error(f"获取表结构失败: {str(e)}")
             return {}
+    
+    def update_column_comment(self, table_name: str, column_name: str, comment: str) -> bool:
+        """更新字段备注"""
+        if not self.is_connected:
+            logger.error("数据库未连接")
+            return False
+        
+        try:
+            # 首先获取字段的当前信息
+            inspector = inspect(self.engine)
+            columns = inspector.get_columns(table_name)
+            
+            target_column = None
+            for col in columns:
+                if col["name"] == column_name:
+                    target_column = col
+                    break
+            
+            if not target_column:
+                logger.error(f"字段 {column_name} 在表 {table_name} 中不存在")
+                return False
+            
+            # 构建ALTER TABLE语句
+            column_type = str(target_column["type"])
+            nullable = "NULL" if target_column["nullable"] else "NOT NULL"
+            default_clause = ""
+            if target_column.get("default") is not None:
+                default_value = target_column["default"]
+                default_clause = f" DEFAULT {default_value}"
+            
+            # 转义备注中的单引号
+            escaped_comment = comment.replace("'", "''")
+            
+            alter_sql = f"""
+            ALTER TABLE `{table_name}` 
+            MODIFY COLUMN `{column_name}` {column_type} {nullable}{default_clause} 
+            COMMENT '{escaped_comment}'
+            """
+            
+            with self.engine.begin() as conn:
+                conn.execute(text(alter_sql))
+            
+            logger.info(f"成功更新表 {table_name} 字段 {column_name} 的备注")
+            return True
+            
+        except SQLAlchemyError as e:
+            logger.error(f"更新字段备注失败: {str(e)}")
+            return False
 
 class SQLiteConnector(DatabaseConnector):
     """SQLite连接器"""

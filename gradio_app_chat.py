@@ -628,7 +628,7 @@ class ChatBIApp:
             return f"❌ 导入失败: {str(e)}"
     
     def get_columns_dataframe(self, table_name: str) -> Tuple[pd.DataFrame, str]:
-        """获取表的字段信息DataFrame"""
+        """获取表的字段信息DataFrame，从数据库字段备注加载描述信息"""
         try:
             if not table_name:
                 return pd.DataFrame(), "请选择一个表"
@@ -653,17 +653,20 @@ class ChatBIApp:
             for col in columns:
                 col_name = col.get("name", "")
                 col_type = col.get("type", "")
+                db_comment = col.get("comment", "")  # 从数据库获取字段备注
                 
                 # 获取字段的元数据
                 business_name = ""
-                description = ""
+                description = db_comment  # 默认使用数据库备注作为描述
                 business_meaning = ""
                 data_examples = ""
                 
                 if table_metadata and col_name in table_metadata.columns:
                     col_metadata = table_metadata.columns[col_name]
                     business_name = col_metadata.business_name
-                    description = col_metadata.description
+                    # 如果有自定义描述，使用自定义描述，否则使用数据库备注
+                    if col_metadata.description:
+                        description = col_metadata.description
                     business_meaning = col_metadata.business_meaning
                     data_examples = ", ".join(col_metadata.data_examples)
                 
@@ -680,13 +683,13 @@ class ChatBIApp:
                 "字段名", "数据类型", "业务名称", "字段描述", "业务含义", "数据示例"
             ])
             
-            return df, f"✅ 已加载表 {table_name} 的 {len(df)} 个字段"
+            return df, f"✅ 已加载表 {table_name} 的 {len(df)} 个字段（包含数据库备注信息）"
             
         except Exception as e:
             return pd.DataFrame(), f"获取字段信息失败: {str(e)}"
     
     def update_columns_from_dataframe(self, table_name: str, df: pd.DataFrame) -> str:
-        """从DataFrame更新字段元数据"""
+        """从DataFrame更新字段元数据，同时更新数据库字段备注"""
         try:
             if not table_name:
                 return "❌ 请选择一个表"
@@ -694,11 +697,15 @@ class ChatBIApp:
             if not self.metadata_manager:
                 return "❌ 元数据管理器未初始化"
             
+            if not self.connector:
+                return "❌ 数据库连接器未初始化"
+            
             if df is None or df.empty:
                 return "❌ 没有数据可更新"
             
             success_count = 0
             error_count = 0
+            db_update_count = 0
             
             for index, row in df.iterrows():
                 try:
@@ -716,8 +723,8 @@ class ChatBIApp:
                     if data_examples_str:
                         data_examples = [ex.strip() for ex in data_examples_str.split(",") if ex.strip()]
                     
-                    # 更新字段元数据
-                    success = self.metadata_manager.update_column_metadata(
+                    # 更新字段元数据到本地缓存
+                    metadata_success = self.metadata_manager.update_column_metadata(
                         table_name=table_name,
                         column_name=col_name,
                         business_name=business_name,
@@ -726,7 +733,22 @@ class ChatBIApp:
                         data_examples=data_examples
                     )
                     
-                    if success:
+                    # 如果字段描述不为空，同时更新数据库字段备注
+                    db_success = True
+                    if description and hasattr(self.connector, 'update_column_comment'):
+                        try:
+                            db_success = self.connector.update_column_comment(
+                                table_name=table_name,
+                                column_name=col_name,
+                                comment=description
+                            )
+                            if db_success:
+                                db_update_count += 1
+                        except Exception as e:
+                            print(f"更新数据库字段备注失败 {col_name}: {e}")
+                            db_success = False
+                    
+                    if metadata_success:
                         success_count += 1
                     else:
                         error_count += 1
@@ -735,10 +757,17 @@ class ChatBIApp:
                     error_count += 1
                     print(f"更新字段 {col_name} 失败: {e}")
             
+            # 构建返回消息
+            result_parts = []
             if error_count == 0:
-                return f"✅ 成功更新 {success_count} 个字段的元数据"
+                result_parts.append(f"✅ 成功更新 {success_count} 个字段的元数据")
             else:
-                return f"⚠️ 更新完成：成功 {success_count} 个，失败 {error_count} 个"
+                result_parts.append(f"⚠️ 元数据更新：成功 {success_count} 个，失败 {error_count} 个")
+            
+            if db_update_count > 0:
+                result_parts.append(f"📝 同时更新了 {db_update_count} 个字段的数据库备注")
+            
+            return "；".join(result_parts)
                 
         except Exception as e:
             return f"❌ 批量更新失败: {str(e)}"
@@ -1024,16 +1053,23 @@ def create_chat_interface():
                                 gr.Markdown("""
                                 **操作步骤：**
                                 1. 选择要管理的表
-                                2. 点击"加载字段"获取字段列表
-                                3. 点击"刷新示例"自动获取数据示例
-                                4. 直接在表格中编辑字段信息
-                                5. 修改后自动保存
+                                2. 点击"📋 加载字段"获取字段列表和数据库备注
+                                3. 点击"🔄 刷新示例"自动获取真实数据示例
+                                4. 直接在表格中编辑字段元数据信息
+                                5. 修改后自动保存到本地缓存和数据库
                                 
                                 **字段说明：**
-                                - **业务名称**：字段的中文名称
-                                - **字段描述**：字段的详细说明
-                                - **业务含义**：字段在业务中的作用
-                                - **数据示例**：自动从数据库获取
+                                - **字段名**：数据库字段名（只读）
+                                - **数据类型**：字段数据类型（只读）
+                                - **业务名称**：字段的中文业务名称
+                                - **字段描述**：会同步更新到数据库字段备注
+                                - **业务含义**：字段在业务场景中的具体含义
+                                - **数据示例**：自动从数据库获取的真实数据样例
+                                
+                                **重要提示：**
+                                - 字段描述会同时更新数据库的COMMENT信息
+                                - 所有元数据会用于AI生成SQL时的参考
+                                - 建议填写准确、详细的业务信息以提高查询效果
                                 """)
                             
                             with gr.Column(scale=3):
