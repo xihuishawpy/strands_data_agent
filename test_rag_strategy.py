@@ -25,9 +25,9 @@ def test_rag_strategy():
         
         # 显示配置参数
         print(f"📋 配置参数:")
-        print(f"  - 相似度阈值: {config.rag_similarity_threshold}")
-        print(f"  - 置信度阈值: {config.rag_confidence_threshold}")
-        print(f"  - 最大示例数: {config.rag_max_examples}")
+        print(f"  - 相似度阈值: {config.rag.similarity_threshold}")
+        print(f"  - 置信度阈值: {config.rag.confidence_threshold}")
+        print(f"  - 最大示例数: {config.rag.max_examples}")
         
         knowledge_manager = get_knowledge_manager()
         
@@ -105,7 +105,7 @@ def test_rag_strategy():
                     actual_strategy = "高相似度-直接使用缓存"
                     print(f"✅ 实际策略: {actual_strategy} (相似度: {confidence:.3f})")
                 else:
-                    if confidence >= (config.rag_similarity_threshold + config.rag_confidence_threshold) / 2:
+                    if confidence >= (config.rag.similarity_threshold + config.rag.confidence_threshold) / 2:
                         actual_strategy = "中相似度-示例辅助生成"
                     else:
                         actual_strategy = "低相似度-常规生成"

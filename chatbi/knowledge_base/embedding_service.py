@@ -32,14 +32,26 @@ class QwenEmbeddingService:
         Returns:
             List[List[float]]: 向量列表
         """
+        import time
+        
         try:
             if not texts:
                 return []
             
+            # 过滤空文本
+            valid_texts = [text.strip() for text in texts if text and text.strip()]
+            if not valid_texts:
+                logger.warning("所有输入文本都为空")
+                return []
+            
+            logger.info(f"开始生成 {len(valid_texts)} 个文本的向量")
+            start_time = time.time()
+            
             # 调用Qwen embedding API
             response = self.client.embeddings.create(
                 model=self.model,
-                input=texts
+                input=valid_texts,
+                timeout=30.0  # 设置30秒超时
             )
             
             # 提取向量
@@ -47,12 +59,25 @@ class QwenEmbeddingService:
             for item in response.data:
                 embeddings.append(item.embedding)
             
-            logger.info(f"成功生成 {len(embeddings)} 个向量")
+            elapsed_time = time.time() - start_time
+            logger.info(f"成功生成 {len(embeddings)} 个向量，耗时: {elapsed_time:.2f}秒")
+            
+            # 验证向量维度
+            if embeddings:
+                dimension = len(embeddings[0])
+                logger.debug(f"向量维度: {dimension}")
+                
+                # 检查所有向量维度是否一致
+                for i, emb in enumerate(embeddings):
+                    if len(emb) != dimension:
+                        logger.warning(f"向量 {i} 维度不一致: {len(emb)} vs {dimension}")
+            
             return embeddings
             
         except Exception as e:
             logger.error(f"生成向量失败: {str(e)}")
-            raise
+            # 不再抛出异常，而是返回空列表
+            return []
     
     def embed_text(self, text: str) -> List[float]:
         """
@@ -64,8 +89,12 @@ class QwenEmbeddingService:
         Returns:
             List[float]: 向量
         """
-        embeddings = self.embed_texts([text])
-        return embeddings[0] if embeddings else []
+        try:
+            embeddings = self.embed_texts([text])
+            return embeddings[0] if embeddings else []
+        except Exception as e:
+            logger.error(f"单文本向量化失败: {str(e)}")
+            return []
 
 # 全局embedding服务实例
 _embedding_service: Optional[QwenEmbeddingService] = None

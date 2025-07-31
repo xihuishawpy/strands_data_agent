@@ -326,12 +326,21 @@ class ChatBIOrchestrator:
 
     
     def _generate_sql(self, question: str, schema_info: str) -> str:
-        """生成SQL查询"""
+        """生成SQL查询，集成RAG功能"""
         try:
-            return self.sql_generator.generate_sql(
-                question=question,
-                schema_info=schema_info
-            )
+            # 检查是否启用RAG功能
+            if self.knowledge_manager.enabled:
+                # 使用RAG增强的SQL生成
+                return self.sql_generator.generate_sql_with_rag(
+                    question=question,
+                    schema_info=schema_info
+                )
+            else:
+                # 使用传统SQL生成
+                return self.sql_generator.generate_sql(
+                    question=question,
+                    schema_info=schema_info
+                )
         except Exception as e:
             logger.error(f"SQL生成失败: {str(e)}")
             return f"ERROR_GENERATION_FAILED: {str(e)}"

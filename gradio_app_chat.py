@@ -10,6 +10,7 @@ import json
 import traceback
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
+from datetime import datetime
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -55,7 +56,7 @@ class ChatBIApp:
             return False, error_msg
     
     def chat_query(self, message: str, history: List, auto_viz: bool = True, enable_analysis: bool = True, analysis_level: str = "standard"):
-        """处理对话式查询 - 支持流式输出"""
+        """处理对话式查询 - 支持流式输出和RAG状态指示"""
         if not message.strip():
             history.append([message, "❌ 请输入有效的查询问题"])
             yield history, "", None
@@ -72,8 +73,34 @@ class ChatBIApp:
             history.append([message, current_response])
             yield history, "", None
             
-            # 步骤1: 获取Schema信息
-            current_response += "📋 **步骤1**: 正在获取数据库Schema信息...\n"
+            # 步骤1: RAG知识库检索
+            current_response += "🔍 **步骤1**: 正在搜索知识库中的相似查询...\n"
+            history[-1][1] = current_response
+            yield history, "", None
+            
+            # 执行RAG检索
+            rag_result = None
+            rag_status = "未使用RAG"
+            if self.orchestrator.knowledge_manager.enabled:
+                rag_result = self.orchestrator.knowledge_manager.search_knowledge(message)
+                if rag_result and rag_result.found_match:
+                    if rag_result.should_use_cached:
+                        rag_status = f"🎯 高相似度缓存 (相似度: {rag_result.confidence:.3f})"
+                        current_response += f"✅ **RAG状态**: {rag_status}\n"
+                    else:
+                        rag_status = f"🔍 示例辅助生成 (相似度: {rag_result.confidence:.3f})"
+                        current_response += f"✅ **RAG状态**: {rag_status}\n"
+                else:
+                    rag_status = "📝 常规生成流程"
+                    current_response += f"✅ **RAG状态**: {rag_status}\n"
+            else:
+                current_response += "⚠️ **RAG状态**: 知识库未启用\n"
+            
+            history[-1][1] = current_response
+            yield history, "", None
+            
+            # 步骤2: 获取Schema信息
+            current_response += "📋 **步骤2**: 正在获取数据库Schema信息...\n"
             history[-1][1] = current_response
             yield history, "", None
             
@@ -108,8 +135,8 @@ class ChatBIApp:
                 yield history, "", None
                 return
             
-            # 构建最终的完整回复
-            final_response = self._build_complete_response(result, auto_viz)
+            # 构建最终的完整回复，包含RAG状态信息
+            final_response = self._build_complete_response(result, auto_viz, rag_status)
             
             # 更新历史记录为最终完整回复
             history[-1][1] = final_response
@@ -125,15 +152,17 @@ class ChatBIApp:
                 elif auto_viz and metadata.get('visualization_suggestion'):
                     chart_data = self._create_chart_from_suggestion(df, metadata['visualization_suggestion'])
             
-            # 保存查询结果用于反馈
+            # 保存查询结果用于反馈，包含RAG状态
             self.last_query_result = result
+            self.last_query_result.rag_status = rag_status
             
             # 添加到内部历史
             self.chat_history.append({
                 "question": message,
                 "sql": result.sql_query,
                 "success": True,
-                "rows": len(result.data) if result.data and isinstance(result.data, list) else 0
+                "rows": len(result.data) if result.data and isinstance(result.data, list) else 0,
+                "rag_status": rag_status
             })
             
             yield history, "", chart_data
@@ -249,14 +278,19 @@ class ChatBIApp:
             print(f"自动选择列失败: {e}")
             return None, None
     
-    def _build_complete_response(self, result, auto_viz: bool) -> str:
-        """构建完整的对话回复"""
+    def _build_complete_response(self, result, auto_viz: bool, rag_status: str = None) -> str:
+        """构建完整的对话回复，包含RAG状态信息"""
         response_parts = []
         
         # 1. 查询摘要
         metadata = result.metadata or {}
         response_parts.append(f"✅ **查询完成** (耗时: {result.execution_time:.2f}秒)")
         response_parts.append(f"📊 获得 **{metadata.get('row_count', 0)}** 行数据")
+        
+        # 添加RAG状态信息
+        if rag_status:
+            response_parts.append(f"🧠 **RAG状态**: {rag_status}")
+        
         response_parts.append("")
         
         # 2. SQL查询展示
@@ -364,6 +398,31 @@ class ChatBIApp:
         except (ValueError, TypeError):
             return str(value)
     
+    def handle_query_with_feedback(self, question: str) -> Tuple[str, str, bool]:
+        """处理查询并提供反馈机制的完整流程"""
+        try:
+            # 执行查询
+            result = self.orchestrator.query(
+                question=question,
+                auto_visualize=True,
+                analysis_level="standard"
+            )
+            
+            if not result.success:
+                return f"❌ 查询失败: {result.error}", "", False
+            
+            # 构建响应
+            response = self._build_complete_response(result, True)
+            
+            # 保存查询结果用于反馈
+            self.last_query_result = result
+            
+            # 返回响应、空的反馈描述、以及是否可以反馈
+            return response, "", True
+            
+        except Exception as e:
+            return f"❌ 系统错误: {str(e)}", "", False
+
     def add_positive_feedback(self, description: str = "") -> str:
         """添加正面反馈到知识库"""
         if not self.last_query_result or not self.last_query_result.success:
@@ -554,6 +613,103 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
             
         except Exception as e:
             return "", "", "", "", f"❌ 获取条目失败: {str(e)}"
+    
+    def export_knowledge_base(self) -> Tuple[str, str]:
+        """导出知识库数据"""
+        try:
+            if not self.orchestrator.knowledge_manager.enabled:
+                return "❌ 导出失败", "知识库未启用"
+            
+            # 获取所有知识库条目
+            items = self.orchestrator.knowledge_manager.get_all_knowledge_items()
+            
+            if not items:
+                return "⚠️ 无数据", "知识库中没有数据可导出"
+            
+            # 构建导出数据
+            export_data = {
+                "version": "1.0",
+                "export_time": datetime.now().isoformat(),
+                "total_items": len(items),
+                "items": items
+            }
+            
+            # 转换为JSON字符串
+            json_str = json.dumps(export_data, ensure_ascii=False, indent=2)
+            
+            return "✅ 导出成功", json_str
+            
+        except Exception as e:
+            return "❌ 导出失败", f"导出过程中出错: {str(e)}"
+    
+    def import_knowledge_base(self, json_data: str) -> str:
+        """导入知识库数据"""
+        try:
+            if not self.orchestrator.knowledge_manager.enabled:
+                return "❌ 知识库未启用，无法导入数据"
+            
+            if not json_data.strip():
+                return "❌ 请提供有效的JSON数据"
+            
+            # 解析JSON数据
+            try:
+                import_data = json.loads(json_data)
+            except json.JSONDecodeError as e:
+                return f"❌ JSON格式错误: {str(e)}"
+            
+            # 验证数据格式
+            if not isinstance(import_data, dict) or 'items' not in import_data:
+                return "❌ 数据格式错误，缺少必要的'items'字段"
+            
+            items = import_data.get('items', [])
+            if not isinstance(items, list):
+                return "❌ 'items'字段必须是数组格式"
+            
+            # 导入数据
+            success_count = 0
+            error_count = 0
+            
+            for item in items:
+                try:
+                    # 验证必要字段
+                    if not item.get('question') or not item.get('sql'):
+                        error_count += 1
+                        continue
+                    
+                    # 添加到知识库
+                    success = self.orchestrator.knowledge_manager.add_positive_feedback(
+                        question=item['question'],
+                        sql=item['sql'],
+                        description=item.get('description', '导入的知识库条目'),
+                        metadata={
+                            'imported': True,
+                            'import_time': datetime.now().isoformat(),
+                            'original_tags': item.get('tags', []),
+                            'original_rating': item.get('rating', 1.0),
+                            'original_usage_count': item.get('usage_count', 0)
+                        }
+                    )
+                    
+                    if success:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"导入单个条目失败: {str(e)}")
+                    error_count += 1
+            
+            # 返回导入结果
+            if success_count > 0:
+                result_msg = f"✅ 导入完成：成功 {success_count} 条"
+                if error_count > 0:
+                    result_msg += f"，失败 {error_count} 条"
+                return result_msg
+            else:
+                return f"❌ 导入失败：所有 {error_count} 条数据都导入失败"
+                
+        except Exception as e:
+            return f"❌ 导入失败: {str(e)}"
     
     # 系统管理功能
     def test_connection(self) -> Tuple[str, str]:
@@ -1153,7 +1309,7 @@ def create_chat_interface():
                                 )
                                 enable_analysis = gr.Checkbox(
                                     label="🧠 智能分析", 
-                                    value=True,
+                                    value=False,
                                     info="对查询结果进行AI分析"
                                 )
                             with gr.Row():
@@ -1230,9 +1386,9 @@ def create_chat_interface():
                                         example_btns.append(btn)
             
             # SQL知识库界面
-            with gr.TabItem("� SQL知识库", elem_id="knowledge-tab"):
+            with gr.TabItem("🐬 SQL知识库", elem_id="knowledge-tab"):
                 gr.Markdown("""
-                ## 🧠 SQL知识库管理
+                ## 🌿 SQL知识库管理
                 
                 通过RAG技术提升SQL生成的准确性和一致性。
                 """)
@@ -1331,6 +1487,31 @@ def create_chat_interface():
                         gr.Markdown("### 📊 知识库统计")
                         refresh_stats_btn = gr.Button("🔄 刷新统计", variant="secondary")
                         knowledge_stats = gr.Markdown("点击'刷新统计'查看知识库状态")
+                        
+                        # 数据导入导出
+                        gr.Markdown("### 📤 数据导入导出")
+                        
+                        with gr.Row():
+                            with gr.Column():
+                                gr.Markdown("**📤 导出知识库**")
+                                export_kb_btn = gr.Button("📤 导出知识库", variant="secondary", size="sm")
+                                export_kb_status = gr.Textbox(label="导出状态", interactive=False, lines=1)
+                                export_kb_data = gr.Textbox(
+                                    label="导出数据",
+                                    lines=8,
+                                    interactive=False,
+                                    placeholder="导出的JSON数据将显示在这里，可复制保存"
+                                )
+                            
+                            with gr.Column():
+                                gr.Markdown("**📥 导入知识库**")
+                                import_kb_data = gr.Textbox(
+                                    label="导入数据",
+                                    lines=8,
+                                    placeholder="请粘贴要导入的JSON数据"
+                                )
+                                import_kb_btn = gr.Button("📥 导入知识库", variant="primary", size="sm")
+                                import_kb_status = gr.Textbox(label="导入状态", interactive=False, lines=1)
                         
                         # 使用说明
                         gr.Markdown("""
@@ -1568,6 +1749,24 @@ def create_chat_interface():
         refresh_stats_btn.click(
             fn=app.get_knowledge_stats,
             outputs=[knowledge_stats]
+        )
+        
+        # 知识库导入导出功能
+        export_kb_btn.click(
+            fn=app.export_knowledge_base,
+            outputs=[export_kb_status, export_kb_data]
+        )
+        
+        import_kb_btn.click(
+            fn=app.import_knowledge_base,
+            inputs=[import_kb_data],
+            outputs=[import_kb_status]
+        ).then(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
+        ).then(
+            fn=lambda: "",
+            outputs=[import_kb_data]
         )
         
         # 知识库表格管理功能

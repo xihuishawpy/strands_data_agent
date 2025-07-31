@@ -201,71 +201,120 @@ class SQLVectorStore:
         Returns:
             List[Dict]: 相似问题列表
         """
+        import time
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError
+        
+        def _search_with_timeout():
+            try:
+                # 首先检查集合中是否有数据
+                collection_count = self.collection.count()
+                logger.info(f"集合中共有 {collection_count} 个条目")
+                
+                if collection_count == 0:
+                    logger.warning("集合为空，无法进行搜索")
+                    return []
+                
+                # 生成查询embedding（添加超时）
+                logger.info(f"开始生成查询向量: {question}")
+                start_time = time.time()
+                query_embedding = self.embedding_service.embed_text(question)
+                embed_time = time.time() - start_time
+                logger.info(f"向量生成完成，耗时: {embed_time:.2f}秒")
+                
+                if not query_embedding:
+                    logger.error("查询向量生成失败")
+                    return []
+                
+                # 执行向量搜索
+                logger.info(f"开始向量搜索，向量维度: {len(query_embedding)}")
+                search_start = time.time()
+                
+                results = self.collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=min(top_k, collection_count),
+                    include=['documents', 'metadatas', 'distances']
+                )
+                
+                search_time = time.time() - search_start
+                logger.info(f"向量搜索完成，耗时: {search_time:.2f}秒")
+                
+                if not results or not results.get('documents') or not results['documents'][0]:
+                    logger.warning("搜索结果为空")
+                    return []
+                
+                similar_items = []
+                documents = results['documents'][0]
+                metadatas = results['metadatas'][0]
+                distances = results['distances'][0]
+                
+                logger.info(f"处理 {len(documents)} 个搜索结果")
+                
+                for i, (doc, metadata, distance) in enumerate(zip(documents, metadatas, distances)):
+                    try:
+                        # 计算相似度（距离越小相似度越高）
+                        similarity = max(0.0, 1.0 - distance / 2.0)
+                        
+                        logger.debug(f"结果 {i+1}: 距离={distance:.4f}, 相似度={similarity:.4f}")
+                        
+                        if similarity >= similarity_threshold:
+                            # 安全地解析tags
+                            tags = []
+                            try:
+                                tags_str = metadata.get("tags", "[]")
+                                if isinstance(tags_str, str):
+                                    tags = json.loads(tags_str)
+                                elif isinstance(tags_str, list):
+                                    tags = tags_str
+                            except:
+                                tags = []
+                            
+                            item = {
+                                "similarity": similarity,
+                                "question": metadata.get("question", ""),
+                                "sql": metadata.get("sql", ""),
+                                "description": metadata.get("description", ""),
+                                "tags": tags,
+                                "rating": float(metadata.get("rating", 0.0)),
+                                "usage_count": int(metadata.get("usage_count", 0)),
+                                "created_at": metadata.get("created_at", ""),
+                                "updated_at": metadata.get("updated_at", "")
+                            }
+                            similar_items.append(item)
+                            logger.info(f"添加相似项: {item['question'][:50]}... (相似度: {similarity:.3f})")
+                    except Exception as item_error:
+                        logger.warning(f"处理搜索结果项 {i} 时出错: {item_error}")
+                        continue
+                
+                # 按相似度排序
+                similar_items.sort(key=lambda x: x["similarity"], reverse=True)
+                
+                logger.info(f"找到 {len(similar_items)} 个相似问题")
+                return similar_items
+                
+            except Exception as e:
+                logger.error(f"搜索过程中出错: {str(e)}")
+                import traceback
+                logger.error(f"详细错误: {traceback.format_exc()}")
+                return []
+        
         try:
-            # 首先检查集合中是否有数据
-            collection_count = self.collection.count()
-            logger.info(f"集合中共有 {collection_count} 个条目")
-            
-            if collection_count == 0:
-                logger.warning("集合为空，无法进行搜索")
-                return []
-            
-            # 生成查询embedding
-            query_embedding = self.embedding_service.embed_text(question)
-            
-            # 执行向量搜索
-            logger.info(f"搜索问题: {question}")
-            results = self.collection.query(
-                query_embeddings=[query_embedding],
-                n_results=min(top_k, collection_count),  # 确保不超过实际数量
-                include=['documents', 'metadatas', 'distances']
-            )
-            
-            logger.info(f"搜索返回结果: {results}")
-            
-            if not results['documents'] or not results['documents'][0]:
-                logger.warning("搜索结果为空")
-                return []
-            
-            similar_items = []
-            documents = results['documents'][0]
-            metadatas = results['metadatas'][0]
-            distances = results['distances'][0]
-            
-            logger.info(f"处理 {len(documents)} 个搜索结果")
-            
-            for i, (doc, metadata, distance) in enumerate(zip(documents, metadatas, distances)):
-                # 计算相似度（距离越小相似度越高）
-                # ChromaDB使用余弦距离，范围是0-2，需要转换为相似度
-                similarity = max(0.0, 1.0 - distance / 2.0)
-                
-                logger.info(f"结果 {i+1}: 距离={distance:.4f}, 相似度={similarity:.4f}, 阈值={similarity_threshold}")
-                
-                if similarity >= similarity_threshold:
-                    item = {
-                        "similarity": similarity,
-                        "question": metadata.get("question", ""),
-                        "sql": metadata.get("sql", ""),
-                        "description": metadata.get("description", ""),
-                        "tags": json.loads(metadata.get("tags", "[]")),
-                        "rating": metadata.get("rating", 0.0),
-                        "usage_count": metadata.get("usage_count", 0),
-                        "created_at": metadata.get("created_at", ""),
-                        "updated_at": metadata.get("updated_at", "")
-                    }
-                    similar_items.append(item)
-                    logger.info(f"添加相似项: {item['question']} (相似度: {similarity:.3f})")
-            
-            # 按相似度排序
-            similar_items.sort(key=lambda x: x["similarity"], reverse=True)
-            
-            logger.info(f"找到 {len(similar_items)} 个相似问题")
-            return similar_items
-            
+            # 使用线程池执行搜索，设置超时
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_search_with_timeout)
+                try:
+                    # 从配置中获取超时时间，默认30秒
+                    timeout = getattr(config.rag, 'search_timeout', 30.0)
+                    result = future.result(timeout=timeout)
+                    return result
+                except TimeoutError:
+                    logger.error(f"搜索超时（{timeout}秒），返回空结果")
+                    return []
+                except Exception as e:
+                    logger.error(f"搜索执行失败: {str(e)}")
+                    return []
+                    
         except Exception as e:
             logger.error(f"搜索相似问题失败: {str(e)}")
-            import traceback
-            logger.error(f"详细错误: {traceback.format_exc()}")
             return []
     
     def update_usage_stats(self, item_id: str, rating_delta: float = 0.0):
@@ -345,6 +394,123 @@ class SQLVectorStore:
         except Exception as e:
             logger.error(f"删除知识条目失败: {str(e)}")
             return False
+    
+    def get_all_items(self) -> List[Dict[str, Any]]:
+        """获取所有知识库条目"""
+        try:
+            # 获取所有条目
+            results = self.collection.get(
+                include=['documents', 'metadatas', 'embeddings']
+            )
+            
+            if not results or not results.get('ids'):
+                return []
+            
+            items = []
+            for i, item_id in enumerate(results['ids']):
+                metadata = results['metadatas'][i] if results.get('metadatas') else {}
+                
+                # 解析tags字段
+                tags = metadata.get('tags', [])
+                if isinstance(tags, str):
+                    try:
+                        tags = json.loads(tags)
+                    except:
+                        tags = []
+                elif not isinstance(tags, list):
+                    tags = []
+                
+                # 构建条目数据
+                item = {
+                    'id': item_id,
+                    'question': metadata.get('question', ''),
+                    'sql': metadata.get('sql', ''),
+                    'description': metadata.get('description', ''),
+                    'tags': tags,
+                    'rating': metadata.get('rating', 0.0),
+                    'usage_count': metadata.get('usage_count', 0),
+                    'created_at': metadata.get('created_at', ''),
+                    'updated_at': metadata.get('updated_at', ''),
+                    'metadata': metadata
+                }
+                items.append(item)
+            
+            logger.info(f"获取到 {len(items)} 个知识库条目")
+            return items
+            
+        except Exception as e:
+            logger.error(f"获取所有知识库条目失败: {str(e)}")
+            return []
+    
+    def update_item(self, item_id: str, update_data: Dict[str, Any]) -> bool:
+        """更新知识库条目"""
+        try:
+            # 首先获取现有条目
+            existing = self.collection.get(
+                ids=[item_id],
+                include=['documents', 'metadatas']
+            )
+            
+            if not existing or not existing.get('ids'):
+                logger.warning(f"条目不存在: {item_id}")
+                return False
+            
+            # 获取现有元数据
+            existing_metadata = existing['metadatas'][0] if existing.get('metadatas') else {}
+            
+            # 处理更新数据，确保符合ChromaDB元数据要求
+            processed_update_data = {}
+            for key, value in update_data.items():
+                if key == 'tags':
+                    # 将tags列表转换为JSON字符串
+                    if isinstance(value, list):
+                        processed_update_data[key] = json.dumps(value, ensure_ascii=False)
+                    else:
+                        processed_update_data[key] = value
+                else:
+                    processed_update_data[key] = value
+            
+            # 合并更新数据
+            new_metadata = {**existing_metadata, **processed_update_data}
+            new_metadata['updated_at'] = datetime.now().isoformat()
+            
+            # 获取tags用于文档构建
+            tags_for_doc = update_data.get('tags', existing_metadata.get('tags', []))
+            if isinstance(tags_for_doc, str):
+                try:
+                    tags_for_doc = json.loads(tags_for_doc)
+                except:
+                    tags_for_doc = []
+            
+            # 构建新的文档内容
+            new_document = self._build_document_content(
+                question=update_data.get('question', existing_metadata.get('question', '')),
+                sql=update_data.get('sql', existing_metadata.get('sql', '')),
+                description=update_data.get('description', existing_metadata.get('description', '')),
+                tags=tags_for_doc
+            )
+            
+            # 生成新的嵌入向量
+            new_embedding = self.embedding_service.embed_text(new_document)
+            
+            # 更新条目
+            self.collection.update(
+                ids=[item_id],
+                documents=[new_document],
+                metadatas=[new_metadata],
+                embeddings=[new_embedding]
+            )
+            
+            logger.info(f"更新知识库条目成功: {item_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"更新知识库条目失败: {str(e)}")
+            return False
+    
+    def delete_item(self, item_id: str) -> bool:
+        """删除知识库条目（别名方法）"""
+        return self.delete_knowledge(item_id)
     
     def _build_document_content(self, 
                                question: str, 
