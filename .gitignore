@@ -26,8 +26,7 @@ data/*.csv
 data/*.xlsx
 data/*.json
 
-# Kiro IDE files
-.kiro/
+
 
 # Test cache
 .pytest_cache/
