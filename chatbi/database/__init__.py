@@ -4,8 +4,8 @@
 """
 
 from .connectors import DatabaseConnector, get_database_connector
-from .sql_executor import SQLExecutor, SQLResult, get_sql_executor
-from .schema_manager import SchemaManager, get_schema_manager
+from .sql_executor import SQLExecutor, SQLResult, get_sql_executor, create_user_sql_executor
+from .schema_manager import SchemaManager, get_schema_manager, create_user_schema_manager
 from .table_metadata_manager import TableMetadataManager, get_table_metadata_manager
 
 __all__ = [
@@ -14,8 +14,10 @@ __all__ = [
     "SQLExecutor",
     "SQLResult",
     "get_sql_executor",
+    "create_user_sql_executor",
     "SchemaManager",
     "get_schema_manager",
+    "create_user_schema_manager",
     "TableMetadataManager",
     "get_table_metadata_manager",
 ] 

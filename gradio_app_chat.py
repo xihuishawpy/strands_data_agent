@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ChatBI 对话式Gradio前端界面
-提供人机交互式的智能数据查询体验
+提供人机交互式的智能数据查询体验，支持用户认证和权限管理
 """
 
 import os
@@ -23,20 +23,52 @@ try:
     from chatbi.config import config
     from chatbi.orchestrator import get_orchestrator
     from chatbi.database import get_database_connector, get_schema_manager, get_table_metadata_manager
+    # 导入认证相关组件
+    from chatbi.auth import (
+        UserManager, SessionManager, AuthDatabase, 
+        get_integration_adapter, require_authentication
+    )
 except ImportError as e:
     print(f"导入错误: {e}")
     print("请确保已安装所有依赖: pip install gradio openai")
     sys.exit(1)
 
 class ChatBIApp:
-    """ChatBI 对话式应用"""
+    """ChatBI 对话式应用，支持用户认证和权限管理"""
     
     def __init__(self):
         """初始化应用"""
-        self.orchestrator = None
+        # 基础ChatBI组件
+        self.base_orchestrator = None
         self.connector = None
         self.schema_manager = None
         self.metadata_manager = None
+        
+        # 认证相关组件
+        try:
+            from chatbi.config import config
+            from chatbi.auth.config import get_auth_config
+            
+            # 使用主配置中的数据库配置
+            database_config = config.database
+            self.auth_database = AuthDatabase(database_config)
+            self.user_manager = UserManager(self.auth_database)
+            self.session_manager = SessionManager(self.auth_database)
+            self.integration_adapter = get_integration_adapter()
+        except Exception as e:
+            # 如果认证组件初始化失败，设置为None
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"认证组件初始化失败: {str(e)}")
+            self.auth_database = None
+            self.user_manager = None
+            self.session_manager = None
+            self.integration_adapter = None
+        
+        # 应用状态
+        self.current_user = None
+        self.current_session_token = None
+        self.authenticated_orchestrator = None
         self.chat_history = []
         self.last_query_result = None  # 存储最后一次查询结果，用于反馈
         
@@ -46,7 +78,7 @@ class ChatBIApp:
     def _initialize_components(self):
         """初始化ChatBI组件"""
         try:
-            self.orchestrator = get_orchestrator()
+            self.base_orchestrator = get_orchestrator()
             self.connector = get_database_connector()
             self.schema_manager = get_schema_manager()
             self.metadata_manager = get_table_metadata_manager()
@@ -55,58 +87,178 @@ class ChatBIApp:
             error_msg = f"❌ 系统初始化失败: {str(e)}"
             return False, error_msg
     
+    def login_user(self, employee_id: str, password: str) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        用户登录
+        
+        Args:
+            employee_id: 工号
+            password: 密码
+            
+        Returns:
+            Tuple[bool, str, Dict]: (是否成功, 消息, 用户信息)
+        """
+        try:
+            if not self.user_manager or not self.session_manager or not self.integration_adapter:
+                return False, "认证系统未初始化，请检查配置", {}
+            
+            if not employee_id.strip() or not password.strip():
+                return False, "请输入工号和密码", {}
+            
+            # 验证用户身份
+            auth_result = self.user_manager.authenticate_user(employee_id.strip(), password)
+            
+            if not auth_result.success:
+                return False, f"登录失败: {auth_result.message}", {}
+            
+            # 创建会话
+            session_result = self.session_manager.create_session(
+                user_id=auth_result.user.id,
+                ip_address="127.0.0.1"  # 在实际应用中应该获取真实IP
+            )
+            
+            if not session_result.success:
+                return False, f"创建会话失败: {session_result.message}", {}
+            
+            # 设置当前用户和会话
+            self.current_user = auth_result.user
+            self.current_session_token = session_result.token
+            
+            # 创建认证包装器
+            self.authenticated_orchestrator = self.integration_adapter.wrap_orchestrator(
+                self.base_orchestrator, self.current_session_token
+            )
+            
+            if not self.authenticated_orchestrator:
+                return False, "创建认证包装器失败", {}
+            
+            # 返回用户信息
+            user_info = {
+                "employee_id": self.current_user.employee_id,
+                "full_name": self.current_user.full_name or "未设置",
+                "email": self.current_user.email or "未设置",
+                "is_admin": self.current_user.is_admin,
+                "login_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+            return True, f"欢迎，{self.current_user.employee_id}！", user_info
+            
+        except Exception as e:
+            return False, f"登录过程中发生错误: {str(e)}", {}
+    
+    def logout_user(self) -> Tuple[bool, str]:
+        """
+        用户登出
+        
+        Returns:
+            Tuple[bool, str]: (是否成功, 消息)
+        """
+        try:
+            if self.current_session_token and self.session_manager:
+                # 销毁会话
+                self.session_manager.invalidate_session(self.current_session_token)
+            
+            # 清除状态
+            self.current_user = None
+            self.current_session_token = None
+            self.authenticated_orchestrator = None
+            self.chat_history = []
+            self.last_query_result = None
+            
+            return True, "已成功登出"
+            
+        except Exception as e:
+            return False, f"登出过程中发生错误: {str(e)}"
+    
+    def register_user(self, employee_id: str, password: str, confirm_password: str, 
+                     email: str = "", full_name: str = "") -> Tuple[bool, str]:
+        """
+        用户注册
+        
+        Args:
+            employee_id: 工号
+            password: 密码
+            confirm_password: 确认密码
+            email: 邮箱（可选）
+            full_name: 姓名（可选）
+            
+        Returns:
+            Tuple[bool, str]: (是否成功, 消息)
+        """
+        try:
+            if not self.user_manager:
+                return False, "认证系统未初始化，请检查配置"
+            
+            if not employee_id.strip() or not password.strip():
+                return False, "工号和密码不能为空"
+            
+            if password != confirm_password:
+                return False, "两次输入的密码不一致"
+            
+            # 注册用户
+            registration_result = self.user_manager.register_user(
+                employee_id=employee_id.strip(),
+                password=password,
+                email=email.strip() if email else None,
+                full_name=full_name.strip() if full_name else None
+            )
+            
+            if registration_result.success:
+                return True, f"注册成功！用户ID: {registration_result.user_id}"
+            else:
+                return False, f"注册失败: {registration_result.message}"
+                
+        except Exception as e:
+            return False, f"注册过程中发生错误: {str(e)}"
+    
+    def is_authenticated(self) -> bool:
+        """检查用户是否已认证"""
+        return (self.current_user is not None and 
+                self.current_session_token is not None and 
+                self.authenticated_orchestrator is not None and
+                self.user_manager is not None)
+    
+    def get_user_info(self) -> Dict[str, Any]:
+        """获取当前用户信息"""
+        if not self.current_user:
+            return {}
+        
+        return {
+            "employee_id": self.current_user.employee_id,
+            "full_name": self.current_user.full_name or "未设置",
+            "email": self.current_user.email or "未设置",
+            "is_admin": self.current_user.is_admin,
+            "is_active": self.current_user.is_active,
+            "created_at": self.current_user.created_at.strftime("%Y-%m-%d") if self.current_user.created_at else "未知"
+        }
+    
     def chat_query(self, message: str, history: List, auto_viz: bool = True, enable_analysis: bool = True, analysis_level: str = "standard"):
-        """处理对话式查询 - 支持流式输出和RAG状态指示"""
+        """处理对话式查询 - 支持流式输出、RAG状态指示和用户权限检查"""
         if not message.strip():
             history.append([message, "❌ 请输入有效的查询问题"])
             yield history, "", None
             return
         
+        # 检查用户是否已认证
+        if not self.is_authenticated():
+            history.append([message, "❌ 请先登录后再进行查询"])
+            yield history, "", None
+            return
+        
         try:
-            if not self.orchestrator:
-                history.append([message, "❌ 系统未初始化，请检查配置"])
+            if not self.authenticated_orchestrator:
+                history.append([message, "❌ 认证系统未初始化，请重新登录"])
                 yield history, "", None
                 return
             
             # 初始化流式响应
-            current_response = "🤖 **正在处理您的查询...**\n\n"
+            current_response = f"🤖 **正在为用户 {self.current_user.employee_id} 处理查询...**\n\n"
             history.append([message, current_response])
             yield history, "", None
             
-            # 步骤1: RAG知识库检索
-            current_response += "🔍 **步骤1**: 正在搜索知识库中的相似查询...\n"
-            history[-1][1] = current_response
-            yield history, "", None
-            
-            # 执行RAG检索
-            rag_result = None
-            rag_status = "未使用RAG"
-            if self.orchestrator.knowledge_manager.enabled:
-                rag_result = self.orchestrator.knowledge_manager.search_knowledge(message)
-                if rag_result and rag_result.found_match:
-                    if rag_result.should_use_cached:
-                        rag_status = f"🎯 高相似度缓存 (相似度: {rag_result.confidence:.3f})"
-                        current_response += f"✅ **RAG状态**: {rag_status}\n"
-                    else:
-                        rag_status = f"🔍 示例辅助生成 (相似度: {rag_result.confidence:.3f})"
-                        current_response += f"✅ **RAG状态**: {rag_status}\n"
-                else:
-                    rag_status = "📝 常规生成流程"
-                    current_response += f"✅ **RAG状态**: {rag_status}\n"
-            else:
-                current_response += "⚠️ **RAG状态**: 知识库未启用\n"
-            
-            history[-1][1] = current_response
-            yield history, "", None
-            
-            # 步骤2: 获取Schema信息
-            current_response += "📋 **步骤2**: 正在获取数据库Schema信息...\n"
-            history[-1][1] = current_response
-            yield history, "", None
-            
-            # 执行查询 - 使用流式版本
+            # 使用认证包装器执行流式查询
             final_analysis_level = analysis_level if enable_analysis else "none"
-            for step_update in self.orchestrator.query_stream(
+            for step_update in self.authenticated_orchestrator.query_stream(
                 question=message,
                 auto_visualize=auto_viz,
                 analysis_level=final_analysis_level
@@ -130,13 +282,15 @@ class ChatBIApp:
             
             if not result.success:
                 error_response = f"❌ 查询失败\n\n**错误信息**: {result.error}"
+                if hasattr(result, 'permission_filtered') and result.permission_filtered:
+                    error_response += "\n\n💡 **提示**: 这可能是权限问题，请联系管理员检查您的数据库访问权限。"
                 current_response += error_response
                 history[-1][1] = current_response
                 yield history, "", None
                 return
             
-            # 构建最终的完整回复，包含RAG状态信息
-            final_response = self._build_complete_response(result, auto_viz, rag_status)
+            # 构建最终的完整回复，包含用户权限信息
+            final_response = self._build_authenticated_response(result, auto_viz)
             
             # 更新历史记录为最终完整回复
             history[-1][1] = final_response
@@ -152,9 +306,8 @@ class ChatBIApp:
                 elif auto_viz and metadata.get('visualization_suggestion'):
                     chart_data = self._create_chart_from_suggestion(df, metadata['visualization_suggestion'])
             
-            # 保存查询结果用于反馈，包含RAG状态
+            # 保存查询结果用于反馈
             self.last_query_result = result
-            self.last_query_result.rag_status = rag_status
             
             # 添加到内部历史
             self.chat_history.append({
@@ -162,7 +315,8 @@ class ChatBIApp:
                 "sql": result.sql_query,
                 "success": True,
                 "rows": len(result.data) if result.data and isinstance(result.data, list) else 0,
-                "rag_status": rag_status
+                "user_id": self.current_user.id,
+                "accessible_schemas": getattr(result, 'accessible_schemas', [])
             })
             
             yield history, "", chart_data
@@ -278,8 +432,100 @@ class ChatBIApp:
             print(f"自动选择列失败: {e}")
             return None, None
     
+    def _build_authenticated_response(self, result, auto_viz: bool) -> str:
+        """构建带认证信息的对话回复"""
+        response_parts = []
+        
+        # 1. 查询摘要
+        metadata = result.metadata or {}
+        response_parts.append(f"✅ **查询完成** (耗时: {result.execution_time:.2f}秒)")
+        response_parts.append(f"📊 获得 **{metadata.get('row_count', 0)}** 行数据")
+        
+        # 添加用户权限信息
+        if hasattr(result, 'accessible_schemas') and result.accessible_schemas:
+            response_parts.append(f"🔐 **可访问的Schema**: {', '.join(result.accessible_schemas)}")
+        
+        response_parts.append("")
+        
+        # 2. SQL查询展示
+        if result.sql_query:
+            response_parts.append("### 🔧 生成的SQL查询")
+            response_parts.append(f"```sql\n{result.sql_query}\n```")
+            
+            # 显示涉及的表
+            if metadata.get('schema_tables_used'):
+                tables_used = metadata['schema_tables_used']
+                response_parts.append(f"**涉及的表**: {', '.join(tables_used)}")
+            response_parts.append("")
+        
+        # 3. 数据结果预览
+        if result.data and len(result.data) > 0:
+            df = pd.DataFrame(result.data)
+            
+            response_parts.append("### 📊 数据结果")
+            response_parts.append(f"**字段**: {', '.join(df.columns)}")
+            
+            # 数据预览
+            display_df = df.head(50)
+            formatted_df = display_df.copy()
+            for col in formatted_df.columns:
+                if formatted_df[col].dtype in ['int64', 'float64']:
+                    formatted_df[col] = formatted_df[col].apply(self._format_number)
+            
+            response_parts.append("\n**数据预览**:")
+            response_parts.append(formatted_df.to_markdown(index=False))
+            
+            if len(df) > 50:
+                response_parts.append(f"\n*显示前50行，总共{len(df)}行*")
+            response_parts.append("")
+        else:
+            # 处理无数据的情况
+            response_parts.append("### 📊 数据结果")
+            response_parts.append("⚠️ **查询执行成功，但未返回任何数据**")
+            response_parts.append("")
+            response_parts.append("**可能的原因**:")
+            response_parts.append("- 查询条件过于严格，没有匹配的记录")
+            response_parts.append("- 相关表中暂无数据")
+            response_parts.append("- JOIN条件可能需要调整")
+            response_parts.append("- 您可能没有访问相关数据的权限")
+            response_parts.append("")
+            response_parts.append("**建议**:")
+            response_parts.append("- 尝试放宽查询条件")
+            response_parts.append("- 检查表中是否有数据")
+            response_parts.append("- 询问具体的表结构和数据情况")
+            response_parts.append("- 联系管理员检查数据访问权限")
+            response_parts.append("")
+        
+        # 4. 智能分析
+        if result.analysis:
+            response_parts.append("### 🔍 智能分析")
+            response_parts.append(result.analysis)
+            response_parts.append("")
+        
+        # 5. 可视化说明
+        if auto_viz:
+            viz_suggestion = metadata.get('visualization_suggestion') or {}
+            chart_type = viz_suggestion.get('chart_type', 'none') if viz_suggestion else 'none'
+            
+            if chart_type != 'none' and result.data and len(result.data) > 0:
+                response_parts.append("### 🎨 数据可视化")
+                if result.chart_info and result.chart_info.get("success"):
+                    response_parts.append(f"✅ 已生成 **{chart_type}** 图表")
+                    if viz_suggestion.get('reason'):
+                        response_parts.append(f"**选择理由**: {viz_suggestion['reason']}")
+                else:
+                    response_parts.append(f"⚠️ 建议使用 **{chart_type}** 图表，但生成失败")
+            elif result.data and len(result.data) > 0:
+                response_parts.append("### 🎨 数据可视化")
+                response_parts.append("ℹ️ 当前数据不适合可视化展示")
+            else:
+                response_parts.append("### 🎨 数据可视化")
+                response_parts.append("ℹ️ 无数据可视化")
+        
+        return "\n".join(response_parts)
+
     def _build_complete_response(self, result, auto_viz: bool, rag_status: str = None) -> str:
-        """构建完整的对话回复，包含RAG状态信息"""
+        """构建完整的对话回复，包含RAG状态信息（保持向后兼容）"""
         response_parts = []
         
         # 1. 查询摘要
@@ -425,14 +671,20 @@ class ChatBIApp:
 
     def add_positive_feedback(self, description: str = "") -> str:
         """添加正面反馈到知识库"""
+        if not self.is_authenticated():
+            return "❌ 请先登录后再提供反馈"
+        
+        if not self.authenticated_orchestrator:
+            return "❌ 认证系统未初始化"
+        
         if not self.last_query_result or not self.last_query_result.success:
             return "❌ 没有可反馈的查询结果"
         
         try:
-            success = self.orchestrator.add_positive_feedback(
+            success = self.authenticated_orchestrator.add_positive_feedback(
                 question=self.last_query_result.question,
                 sql=self.last_query_result.sql_query,
-                description=description or "用户点赞的高质量查询"
+                description=description or f"用户 {self.current_user.employee_id} 点赞的高质量查询"
             )
             
             if success:
@@ -446,11 +698,17 @@ class ChatBIApp:
     def get_knowledge_stats(self) -> str:
         """获取知识库统计信息"""
         try:
-            stats = self.orchestrator.get_knowledge_stats()
+            # 使用认证包装器或基础orchestrator
+            orchestrator = self.authenticated_orchestrator if self.is_authenticated() else self.base_orchestrator
+            if not orchestrator:
+                return "❌ 系统未初始化"
+            
+            stats = orchestrator.get_knowledge_stats()
             
             if stats.get("enabled"):
+                user_info = f" (当前用户: {self.current_user.employee_id})" if self.is_authenticated() else ""
                 return f"""
-### 📊 SQL知识库统计
+### 📊 SQL知识库统计{user_info}
 
 - **总条目数**: {stats.get('total_items', 0)}
 - **平均评分**: {stats.get('avg_rating', 0):.2f}
@@ -470,6 +728,11 @@ class ChatBIApp:
    - 中相似度(0.6-0.8): 使用相似示例辅助生成
    - 低相似度(<0.6): 常规生成流程
 4. **持续学习**: 用户点赞的查询自动加入知识库
+
+### 🔐 权限说明
+- 登录用户的查询会根据其数据库访问权限进行过滤
+- 反馈的查询会记录提交用户信息
+- 管理员可以查看所有用户的反馈记录
                 """
             else:
                 return f"""
@@ -487,6 +750,11 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
 - 🧠 智能检索匹配历史查询
 - 👍 收集用户反馈持续改进
 - 🚀 提升SQL生成准确性和一致性
+
+### 🔐 认证功能
+- 支持用户登录和权限管理
+- 根据用户权限过滤数据库访问
+- 记录用户操作审计日志
                 """
         except Exception as e:
             return f"❌ 获取知识库统计失败: {str(e)}"
@@ -710,78 +978,472 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
                 
         except Exception as e:
             return f"❌ 导入失败: {str(e)}"
+
+
+def create_authenticated_chatbi_app() -> gr.Blocks:
+    """创建带认证功能的ChatBI应用"""
     
+    # 创建应用实例
+    app = ChatBIApp()
+    
+    # 自定义CSS样式
+    custom_css = """
+    .user-info-box {
+        background-color: #f0f8ff;
+        border: 1px solid #4CAF50;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 10px 0;
+    }
+    .login-box {
+        background-color: #fff8dc;
+        border: 1px solid #ffa500;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+    }
+    .error-message {
+        color: #d32f2f;
+        font-weight: bold;
+    }
+    .success-message {
+        color: #388e3c;
+        font-weight: bold;
+    }
+    """
+    
+    with gr.Blocks(
+        title="ChatBI 智能数据查询系统",
+        theme=gr.themes.Soft(),
+        css=custom_css
+    ) as demo:
+        
+        # 应用状态
+        user_state = gr.State({})
+        login_state = gr.State(False)
+        
+        # 标题
+        gr.Markdown("# 🤖 ChatBI 智能数据查询系统")
+        gr.Markdown("基于自然语言的智能数据分析平台，支持用户认证和权限管理")
+        
+        # 用户信息显示区域
+        with gr.Row():
+            user_info_display = gr.Markdown("", elem_classes=["user-info-box"], visible=False)
+        
+        # 主要内容区域
+        with gr.Tab("💬 智能查询") as chat_tab:
+            with gr.Row():
+                with gr.Column(scale=3):
+                    # 聊天界面
+                    chatbot = gr.Chatbot(
+                        label="ChatBI 对话",
+                        height=500,
+                        show_label=True,
+                        container=True,
+                        bubble_full_width=False
+                    )
+                    
+                    # 输入区域
+                    with gr.Row():
+                        msg_input = gr.Textbox(
+                            label="输入您的问题",
+                            placeholder="例如：显示最近一周的销售数据（请先登录）",
+                            scale=4,
+                            container=False
+                        )
+                        send_btn = gr.Button("发送", variant="primary", scale=1)
+                    
+                    # 查询选项
+                    with gr.Row():
+                        auto_viz_checkbox = gr.Checkbox(
+                            label="自动生成可视化",
+                            value=True
+                        )
+                        enable_analysis_checkbox = gr.Checkbox(
+                            label="启用数据分析",
+                            value=True
+                        )
+                        analysis_level_dropdown = gr.Dropdown(
+                            label="分析级别",
+                            choices=["basic", "standard", "detailed"],
+                            value="standard"
+                        )
+                
+                with gr.Column(scale=1):
+                    # 可视化显示区域
+                    plot_output = gr.Plot(
+                        label="数据可视化",
+                        visible=True
+                    )
+                    
+                    # 反馈区域
+                    gr.Markdown("### 📝 查询反馈")
+                    feedback_description = gr.Textbox(
+                        label="反馈描述（可选）",
+                        placeholder="请描述您对查询结果的看法"
+                    )
+                    
+                    with gr.Row():
+                        like_btn = gr.Button("👍 点赞", variant="secondary")
+                        feedback_output = gr.Textbox(
+                            label="反馈状态",
+                            interactive=False,
+                            max_lines=2
+                        )
+        
+        # 登录/注册标签页
+        with gr.Tab("🔐 用户认证") as auth_tab:
+            with gr.Row():
+                # 登录区域
+                with gr.Column(scale=1):
+                    gr.Markdown("### 用户登录")
+                    
+                    login_employee_id = gr.Textbox(
+                        label="工号",
+                        placeholder="请输入您的工号"
+                    )
+                    login_password = gr.Textbox(
+                        label="密码",
+                        type="password",
+                        placeholder="请输入密码"
+                    )
+                    
+                    with gr.Row():
+                        login_btn = gr.Button("登录", variant="primary")
+                        logout_btn = gr.Button("登出", variant="secondary", visible=False)
+                    
+                    login_message = gr.Textbox(
+                        label="登录状态",
+                        interactive=False,
+                        max_lines=3
+                    )
+                
+                # 注册区域
+                with gr.Column(scale=1):
+                    gr.Markdown("### 用户注册")
+                    
+                    reg_employee_id = gr.Textbox(
+                        label="工号",
+                        placeholder="请输入您的工号"
+                    )
+                    reg_password = gr.Textbox(
+                        label="密码",
+                        type="password",
+                        placeholder="请输入密码"
+                    )
+                    reg_confirm_password = gr.Textbox(
+                        label="确认密码",
+                        type="password",
+                        placeholder="请再次输入密码"
+                    )
+                    reg_email = gr.Textbox(
+                        label="邮箱（可选）",
+                        placeholder="请输入邮箱地址"
+                    )
+                    reg_full_name = gr.Textbox(
+                        label="姓名（可选）",
+                        placeholder="请输入您的姓名"
+                    )
+                    
+                    register_btn = gr.Button("注册", variant="primary")
+                    register_message = gr.Textbox(
+                        label="注册状态",
+                        interactive=False,
+                        max_lines=3
+                    )
+        
+        # 系统信息标签页
+        with gr.Tab("ℹ️ 系统信息") as info_tab:
+            gr.Markdown("### 系统状态")
+            
+            with gr.Row():
+                test_conn_btn = gr.Button("测试数据库连接")
+                refresh_schema_btn = gr.Button("刷新Schema缓存")
+                get_schema_btn = gr.Button("获取Schema信息")
+            
+            system_status = gr.Textbox(
+                label="系统状态",
+                interactive=False,
+                max_lines=10
+            )
+            
+            gr.Markdown("### 知识库信息")
+            knowledge_stats_btn = gr.Button("获取知识库统计")
+            knowledge_stats_output = gr.Textbox(
+                label="知识库统计",
+                interactive=False,
+                max_lines=15
+            )
+            
+            gr.Markdown("### 使用说明")
+            gr.Markdown("""
+            **使用步骤：**
+            1. 在"用户认证"标签页中登录或注册账户
+            2. 登录成功后，在"智能查询"标签页中输入自然语言问题
+            3. 系统会根据您的权限自动过滤可访问的数据
+            4. 查看查询结果和可视化图表
+            5. 可以对查询结果进行反馈
+            
+            **权限说明：**
+            - 不同用户具有不同的数据库访问权限
+            - 系统会自动过滤您无权访问的数据
+            - 如有权限问题，请联系管理员
+            
+            **注意事项：**
+            - 请妥善保管您的登录凭据
+            - 定期更换密码以确保账户安全
+            - 如遇问题请及时联系技术支持
+            """)
+        
+        # 事件处理函数
+        def handle_login(employee_id, password):
+            """处理登录"""
+            success, message, user_info = app.login_user(employee_id, password)
+            
+            if success:
+                # 更新界面状态
+                user_display = f"""
+                **当前用户:** {user_info['employee_id']} ({user_info['full_name']})
+                **邮箱:** {user_info['email']}
+                **管理员:** {'是' if user_info['is_admin'] else '否'}
+                **登录时间:** {user_info['login_time']}
+                """
+                
+                return (
+                    True,  # login_state
+                    user_info,  # user_state
+                    user_display,  # user_info_display
+                    True,  # user_info_display visible
+                    message,  # login_message
+                    "",  # clear employee_id
+                    "",  # clear password
+                    gr.update(visible=False),  # login_btn
+                    gr.update(visible=True),   # logout_btn
+                    "例如：显示最近一周的销售数据"  # update placeholder
+                )
+            else:
+                return (
+                    False,  # login_state
+                    {},  # user_state
+                    "",  # user_info_display
+                    False,  # user_info_display visible
+                    message,  # login_message
+                    employee_id,  # keep employee_id
+                    "",  # clear password
+                    gr.update(visible=True),   # login_btn
+                    gr.update(visible=False),  # logout_btn
+                    "例如：显示最近一周的销售数据（请先登录）"  # keep placeholder
+                )
+        
+        def handle_logout():
+            """处理登出"""
+            success, message = app.logout_user()
+            
+            return (
+                False,  # login_state
+                {},  # user_state
+                "",  # user_info_display
+                False,  # user_info_display visible
+                message,  # login_message
+                "",  # clear employee_id
+                "",  # clear password
+                gr.update(visible=True),   # login_btn
+                gr.update(visible=False),  # logout_btn
+                "例如：显示最近一周的销售数据（请先登录）",  # update placeholder
+                []  # clear chatbot
+            )
+        
+        def handle_register(employee_id, password, confirm_password, email, full_name):
+            """处理注册"""
+            success, message = app.register_user(
+                employee_id, password, confirm_password, email, full_name
+            )
+            
+            if success:
+                return message, "", "", "", "", ""  # clear all fields
+            else:
+                return message, employee_id, "", "", email, full_name  # keep non-password fields
+        
+        def handle_chat(message, history, auto_viz, enable_analysis, analysis_level):
+            """处理聊天查询"""
+            if not app.is_authenticated():
+                history.append([message, "❌ 请先登录后再进行查询"])
+                return history, "", None
+            
+            # 使用生成器处理流式响应
+            for result in app.chat_query(message, history, auto_viz, enable_analysis, analysis_level):
+                yield result
+        
+        def handle_feedback(description):
+            """处理反馈"""
+            result = app.add_positive_feedback(description)
+            return result, ""  # clear description
+        
+        def handle_test_connection():
+            """处理数据库连接测试"""
+            status, info = app.test_connection()
+            return f"{status}\n\n{info}"
+        
+        def handle_refresh_schema():
+            """处理Schema刷新"""
+            status, info = app.refresh_schema()
+            return f"{status}\n\n{info}"
+        
+        def handle_get_schema():
+            """处理获取Schema信息"""
+            status, info = app.get_schema_info()
+            return f"{status}\n\n{info}"
+        
+        def handle_knowledge_stats():
+            """处理获取知识库统计"""
+            return app.get_knowledge_stats()
+        
+        # 绑定事件
+        login_btn.click(
+            handle_login,
+            inputs=[login_employee_id, login_password],
+            outputs=[
+                login_state, user_state, user_info_display, user_info_display,
+                login_message, login_employee_id, login_password,
+                login_btn, logout_btn, msg_input
+            ]
+        )
+        
+        logout_btn.click(
+            handle_logout,
+            outputs=[
+                login_state, user_state, user_info_display, user_info_display,
+                login_message, login_employee_id, login_password,
+                login_btn, logout_btn, msg_input, chatbot
+            ]
+        )
+        
+        register_btn.click(
+            handle_register,
+            inputs=[reg_employee_id, reg_password, reg_confirm_password, reg_email, reg_full_name],
+            outputs=[register_message, reg_employee_id, reg_password, reg_confirm_password, reg_email, reg_full_name]
+        )
+        
+        # 聊天事件
+        send_btn.click(
+            handle_chat,
+            inputs=[msg_input, chatbot, auto_viz_checkbox, enable_analysis_checkbox, analysis_level_dropdown],
+            outputs=[chatbot, msg_input, plot_output]
+        )
+        
+        msg_input.submit(
+            handle_chat,
+            inputs=[msg_input, chatbot, auto_viz_checkbox, enable_analysis_checkbox, analysis_level_dropdown],
+            outputs=[chatbot, msg_input, plot_output]
+        )
+        
+        # 反馈事件
+        like_btn.click(
+            handle_feedback,
+            inputs=[feedback_description],
+            outputs=[feedback_output, feedback_description]
+        )
+        
+        # 系统信息事件
+        test_conn_btn.click(
+            handle_test_connection,
+            outputs=[system_status]
+        )
+        
+        refresh_schema_btn.click(
+            handle_refresh_schema,
+            outputs=[system_status]
+        )
+        
+        get_schema_btn.click(
+            handle_get_schema,
+            outputs=[system_status]
+        )
+        
+        knowledge_stats_btn.click(
+            handle_knowledge_stats,
+            outputs=[knowledge_stats_output]
+        )
+    
+    return demo
+
     # 系统管理功能
     def test_connection(self) -> Tuple[str, str]:
-        """测试数据库连接"""    
+        """测试数据库连接（根据用户权限）"""    
         try:
-            if not self.connector:
-                return "❌ 连接失败", "数据库连接器未初始化"
-            
-            success = self.connector.connect()
-            if success:
-                tables = self.connector.get_table_names()
-                table_count = len(tables) if tables else 0
+            if self.is_authenticated():
+                # 使用认证包装器测试连接
+                if not self.authenticated_orchestrator:
+                    return "❌ 连接失败", "认证系统未初始化"
+                
+                # 尝试获取用户可访问的schema信息来测试连接
+                schema_info = self.authenticated_orchestrator.get_schema_info()
+                
+                if "error" in schema_info:
+                    return "❌ 连接失败", f"用户连接测试失败: {schema_info['error']}"
+                
+                # 获取用户可访问的schema数量
+                accessible_schemas = getattr(self.last_query_result, 'accessible_schemas', []) if self.last_query_result else []
+                schema_count = len(accessible_schemas)
                 
                 info = f"""
-### 🔗 数据库连接成功
+### 🔗 数据库连接成功 (用户: {self.current_user.employee_id})
 - **数据库类型**: {config.database.type}
 - **主机**: {config.database.host}:{config.database.port}
 - **数据库**: {config.database.database}
-- **表数量**: {table_count}个
+- **可访问Schema数量**: {schema_count}个
+- **可访问Schema**: {', '.join(accessible_schemas) if accessible_schemas else '无'}
 - **连接状态**: ✅ 正常
+- **权限状态**: ✅ 已认证
                 """
                 
                 return "✅ 连接成功", info
             else:
-                return "❌ 连接失败", "无法连接到数据库，请检查配置"
+                # 未认证用户，测试基础连接
+                if not self.connector:
+                    return "❌ 连接失败", "数据库连接器未初始化，请先登录"
+                
+                return "⚠️ 未认证", "请先登录以测试您的数据库访问权限"
                 
         except Exception as e:
             return "❌ 连接失败", f"连接测试失败: {str(e)}"
     
     def get_schema_info(self) -> Tuple[str, str]:
-        """获取数据库Schema信息"""
+        """获取数据库Schema信息（根据用户权限过滤）"""
         try:
-            if not self.schema_manager:
-                return "❌ 获取失败", "Schema管理器未初始化"
-            
-            schema = self.schema_manager.get_database_schema()
-            
-            if not schema or not schema.get("tables"):
-                return "⚠️ 无数据", "数据库中没有找到表"
-            
-            info_parts = ["### 📊 数据库Schema信息\n"]
-            
-            tables = schema.get("tables", {})
-            table_names = list(tables.keys())
-            
-            for table_name in table_names[:10]:
-                table_info = tables[table_name]
+            if self.is_authenticated():
+                # 使用认证包装器获取过滤后的schema信息
+                schema_info = self.authenticated_orchestrator.get_schema_info()
                 
-                info_parts.append(f"#### 表: `{table_name}`")
+                if "error" in schema_info:
+                    return "❌ 获取失败", schema_info["error"]
                 
-                columns = table_info.get('columns', [])
-                if columns:
-                    info_parts.append("**字段:**")
-                    for col in columns[:8]:
-                        col_info = f"- `{col.get('name', 'Unknown')}` ({col.get('type', 'Unknown')})"
-                        if not col.get('nullable', True):
-                            col_info += " [NOT NULL]"
-                        info_parts.append(col_info)
+                # 构建用户特定的schema信息显示
+                user_info = f"### 📊 数据库Schema信息 (用户: {self.current_user.employee_id})\n\n"
+                
+                # 获取用户可访问的schema列表
+                accessible_schemas = getattr(self.last_query_result, 'accessible_schemas', []) if self.last_query_result else []
+                if accessible_schemas:
+                    user_info += f"🔐 **您可访问的Schema**: {', '.join(accessible_schemas)}\n\n"
+                
+                # 这里需要根据实际的schema_info结构来格式化显示
+                if isinstance(schema_info, dict):
+                    info_parts = [user_info]
                     
-                    if len(columns) > 8:
-                        info_parts.append(f"- ... 还有 {len(columns) - 8} 个字段")
+                    # 简单的schema信息显示
+                    for key, value in schema_info.items():
+                        if key != "error":
+                            info_parts.append(f"**{key}**: {str(value)[:500]}...")
+                    
+                    return "✅ 获取成功", "\n".join(info_parts)
+                else:
+                    return "✅ 获取成功", user_info + str(schema_info)
+            else:
+                # 未认证用户，使用基础schema管理器
+                if not self.schema_manager:
+                    return "❌ 获取失败", "Schema管理器未初始化，请先登录"
                 
-                primary_keys = table_info.get('primary_keys', [])
-                if primary_keys:
-                    info_parts.append(f"**主键:** {', '.join(primary_keys)}")
-                
-                info_parts.append("")
-            
-            if len(table_names) > 10:
-                info_parts.append(f"*... 还有 {len(table_names) - 10} 个表*")
-            
-            return "✅ 获取成功", "\n".join(info_parts)
+                return "⚠️ 未认证", "请先登录以查看您有权限访问的Schema信息"
             
         except Exception as e:
             error_detail = f"获取Schema失败: {str(e)}\n\n详细错误:\n```\n{traceback.format_exc()}\n```"
@@ -790,13 +1452,16 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
     def refresh_schema(self) -> Tuple[str, str]:
         """刷新Schema缓存"""
         try:
-            if not self.orchestrator:
-                return "❌ 错误", "系统未初始化"
+            # 使用认证包装器或基础orchestrator
+            orchestrator = self.authenticated_orchestrator if self.is_authenticated() else self.base_orchestrator
+            if not orchestrator:
+                return "❌ 错误", "系统未初始化，请先登录"
             
-            success = self.orchestrator.refresh_schema()
+            success = orchestrator.refresh_schema()
             
             if success:
-                return "✅ 刷新成功", "Schema缓存已刷新"
+                user_info = f" (用户: {self.current_user.employee_id})" if self.is_authenticated() else ""
+                return "✅ 刷新成功", f"Schema缓存已刷新{user_info}"
             else:
                 return "❌ 刷新失败", "Schema缓存刷新失败"
                 
@@ -1913,11 +2578,18 @@ def create_chat_interface():
     return interface
 
 if __name__ == "__main__":
-    interface = create_chat_interface()
+    # 使用带认证功能的应用
+    interface = create_authenticated_chatbi_app()
     
-    print("🚀 启动ChatBI对话式界面...")
+    print("🚀 启动ChatBI带认证功能的对话式界面...")
     print(f"📊 数据库类型: {config.database.type}")
     print(f"🤖 AI模型: {config.llm.model_name}")
+    print("🔐 认证功能: 已启用")
+    print("📋 功能说明:")
+    print("  - 用户认证和权限管理")
+    print("  - 智能数据查询和分析")
+    print("  - 自动可视化生成")
+    print("  - 查询反馈和优化")
     
     interface.launch(
         server_name="0.0.0.0",

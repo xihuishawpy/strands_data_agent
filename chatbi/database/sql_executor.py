@@ -1,6 +1,6 @@
 """
 SQL执行器
-提供安全的SQL执行功能，包括SQL验证、注入防护等
+提供安全的SQL执行功能，包括SQL验证、注入防护和用户权限验证
 """
 
 import re
@@ -105,13 +105,42 @@ class SQLValidator:
 class SQLExecutor:
     """SQL执行器"""
     
-    def __init__(self):
+    def __init__(self, user_id: Optional[str] = None):
+        """
+        初始化SQL执行器
+        
+        Args:
+            user_id: 用户ID，如果提供则启用权限检查
+        """
+        self.user_id = user_id
         self.connector = get_global_connector()
         self.validator = SQLValidator()
+        
+        # 如果提供了用户ID，则使用用户特定的数据库连接器
+        if user_id:
+            self._setup_user_connector()
+    
+    def _setup_user_connector(self):
+        """设置用户特定的数据库连接器"""
+        try:
+            from ..auth.chatbi_integration import get_integration_adapter
+            
+            integration = get_integration_adapter()
+            user_connector = integration.create_user_database_connector(self.user_id)
+            
+            if user_connector:
+                self.connector = user_connector
+                logger.info(f"为用户 {self.user_id} 设置了特定的数据库连接器")
+            else:
+                logger.warning(f"无法为用户 {self.user_id} 创建特定的数据库连接器，使用默认连接器")
+                
+        except Exception as e:
+            logger.error(f"设置用户数据库连接器失败: {str(e)}")
+            # 继续使用默认连接器
     
     def execute(self, query: str, params: Dict[str, Any] = None) -> SQLResult:
         """
-        执行SQL查询
+        执行SQL查询（带用户权限验证）
         
         Args:
             query: SQL查询语句
@@ -151,6 +180,20 @@ class SQLExecutor:
                     query=query
                 )
             
+            # 如果有用户ID，进行权限验证
+            if self.user_id:
+                permission_result = self._validate_user_permissions(query)
+                if not permission_result["valid"]:
+                    logger.warning(f"用户 {self.user_id} SQL权限验证失败: {permission_result['error']}")
+                    return SQLResult(
+                        success=False,
+                        data=[],
+                        columns=[],
+                        row_count=0,
+                        error=f"权限验证失败: {permission_result['error']}",
+                        query=query
+                    )
+            
             logger.info(f"执行SQL查询: {query}")
             
             # 执行查询
@@ -189,6 +232,43 @@ class SQLExecutor:
                 execution_time=execution_time,
                 query=query
             )
+    
+    def _validate_user_permissions(self, query: str) -> Dict[str, Any]:
+        """
+        验证用户对SQL查询的权限
+        
+        Args:
+            query: SQL查询语句
+            
+        Returns:
+            Dict[str, Any]: 验证结果
+        """
+        try:
+            from ..auth.database_permission_filter import DatabasePermissionFilter
+            from ..auth.permission_manager import PermissionManager
+            from ..auth.database import AuthDatabase
+            
+            # 创建权限过滤器
+            permission_manager = PermissionManager()
+            auth_database = AuthDatabase()
+            permission_filter = DatabasePermissionFilter(permission_manager, auth_database)
+            
+            # 验证SQL权限
+            validation_result = permission_filter.validate_sql_permissions(self.user_id, query)
+            
+            return {
+                "valid": validation_result.valid,
+                "error": validation_result.message if not validation_result.valid else None,
+                "allowed_schemas": validation_result.allowed_schemas,
+                "blocked_schemas": validation_result.blocked_schemas
+            }
+            
+        except Exception as e:
+            logger.error(f"用户权限验证异常: {str(e)}")
+            return {
+                "valid": False,
+                "error": f"权限验证过程中发生错误: {str(e)}"
+            }
     
     def explain_query(self, query: str) -> Dict[str, Any]:
         """
@@ -261,11 +341,36 @@ class SQLExecutor:
 # 全局SQL执行器实例
 _sql_executor: Optional[SQLExecutor] = None
 
-def get_sql_executor() -> SQLExecutor:
-    """获取全局SQL执行器实例"""
+def get_sql_executor(user_id: Optional[str] = None) -> SQLExecutor:
+    """
+    获取SQL执行器实例
+    
+    Args:
+        user_id: 用户ID，如果提供则返回带权限检查的执行器
+        
+    Returns:
+        SQLExecutor: SQL执行器实例
+    """
+    if user_id:
+        # 为特定用户创建新的执行器实例
+        return SQLExecutor(user_id=user_id)
+    
+    # 返回全局执行器实例
     global _sql_executor
     
     if _sql_executor is None:
         _sql_executor = SQLExecutor()
     
-    return _sql_executor 
+    return _sql_executor
+
+def create_user_sql_executor(user_id: str) -> SQLExecutor:
+    """
+    为特定用户创建SQL执行器
+    
+    Args:
+        user_id: 用户ID
+        
+    Returns:
+        SQLExecutor: 用户特定的SQL执行器
+    """
+    return SQLExecutor(user_id=user_id) 

@@ -118,6 +118,59 @@ class RAGConfig:
             "warnings": warnings
         }
 
+@dataclass
+class AuthConfig:
+    """认证配置"""
+    # 会话配置
+    session_timeout: int = 3600  # 会话超时时间（秒）
+    session_cleanup_interval: int = 300  # 会话清理间隔（秒）
+    max_sessions_per_user: int = 5  # 每个用户最大会话数
+    
+    # 登录安全配置
+    max_login_attempts: int = 5  # 最大登录尝试次数
+    lockout_duration: int = 900  # 账户锁定时间（秒）
+    lockout_enabled: bool = True  # 是否启用账户锁定
+    
+    # 密码配置
+    password_min_length: int = 8  # 密码最小长度
+    password_max_length: int = 128  # 密码最大长度
+    require_password_complexity: bool = True  # 是否要求密码复杂度
+    
+    # JWT配置
+    jwt_secret_key: str = ""  # JWT密钥
+    jwt_algorithm: str = "HS256"  # JWT算法
+    jwt_expiration: int = 3600  # JWT过期时间（秒）
+    
+    # 安全配置
+    enable_csrf_protection: bool = True  # 启用CSRF防护
+    enable_audit_logging: bool = True  # 启用审计日志
+
+@dataclass
+class PermissionConfig:
+    """权限配置"""
+    # 默认权限配置
+    default_schema_access: list = None  # 默认schema访问权限
+    admin_schemas: list = None  # 管理员可访问的所有schema
+    public_schemas: list = None  # 公共schema（所有用户可访问）
+    
+    # 权限控制配置
+    schema_isolation_enabled: bool = True  # 是否启用schema隔离
+    strict_permission_check: bool = True  # 是否启用严格权限检查
+    inherit_admin_permissions: bool = True  # 管理员是否继承所有权限
+    
+    # 权限缓存配置
+    permission_cache_enabled: bool = True  # 是否启用权限缓存
+    permission_cache_ttl: int = 300  # 权限缓存TTL（秒）
+    
+    def __post_init__(self):
+        """初始化后处理"""
+        if self.default_schema_access is None:
+            self.default_schema_access = []
+        if self.admin_schemas is None:
+            self.admin_schemas = []
+        if self.public_schemas is None:
+            self.public_schemas = []
+
 class Config:
     """主配置类"""
     
@@ -126,6 +179,8 @@ class Config:
         self.llm = self._load_llm_config()
         self.web = self._load_web_config()
         self.rag = self._load_rag_config()
+        self.auth = self._load_auth_config()
+        self.permission = self._load_permission_config()
         self.knowledge_base_path = os.getenv("KNOWLEDGE_BASE_PATH", "./data/knowledge_base")
         self.schema_cache_ttl = int(os.getenv("SCHEMA_CACHE_TTL", "3600"))
         self.log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -215,6 +270,45 @@ class Config:
             logging.warning(f"RAG配置参数解析失败，使用默认值: {e}")
             return RAGConfig()  # 使用默认值
     
+    def _load_auth_config(self) -> AuthConfig:
+        """加载认证配置"""
+        return AuthConfig(
+            session_timeout=int(os.getenv("AUTH_SESSION_TIMEOUT", "3600")),
+            session_cleanup_interval=int(os.getenv("AUTH_SESSION_CLEANUP_INTERVAL", "300")),
+            max_sessions_per_user=int(os.getenv("AUTH_MAX_SESSIONS_PER_USER", "5")),
+            max_login_attempts=int(os.getenv("AUTH_MAX_LOGIN_ATTEMPTS", "5")),
+            lockout_duration=int(os.getenv("AUTH_LOCKOUT_DURATION", "900")),
+            lockout_enabled=os.getenv("AUTH_LOCKOUT_ENABLED", "true").lower() == "true",
+            password_min_length=int(os.getenv("AUTH_PASSWORD_MIN_LENGTH", "8")),
+            password_max_length=int(os.getenv("AUTH_PASSWORD_MAX_LENGTH", "128")),
+            require_password_complexity=os.getenv("AUTH_REQUIRE_PASSWORD_COMPLEXITY", "true").lower() == "true",
+            jwt_secret_key=os.getenv("AUTH_JWT_SECRET_KEY", "your_jwt_secret_key_here"),
+            jwt_algorithm=os.getenv("AUTH_JWT_ALGORITHM", "HS256"),
+            jwt_expiration=int(os.getenv("AUTH_JWT_EXPIRATION", "3600")),
+            enable_csrf_protection=os.getenv("AUTH_ENABLE_CSRF_PROTECTION", "true").lower() == "true",
+            enable_audit_logging=os.getenv("AUTH_ENABLE_AUDIT_LOGGING", "true").lower() == "true"
+        )
+    
+    def _load_permission_config(self) -> PermissionConfig:
+        """加载权限配置"""
+        # 解析列表类型的环境变量
+        def parse_list_env(env_var: str, default: list = None) -> list:
+            value = os.getenv(env_var, "")
+            if not value:
+                return default or []
+            return [item.strip() for item in value.split(",") if item.strip()]
+        
+        return PermissionConfig(
+            default_schema_access=parse_list_env("PERM_DEFAULT_SCHEMA_ACCESS"),
+            admin_schemas=parse_list_env("PERM_ADMIN_SCHEMAS"),
+            public_schemas=parse_list_env("PERM_PUBLIC_SCHEMAS"),
+            schema_isolation_enabled=os.getenv("PERM_SCHEMA_ISOLATION_ENABLED", "true").lower() == "true",
+            strict_permission_check=os.getenv("PERM_STRICT_PERMISSION_CHECK", "true").lower() == "true",
+            inherit_admin_permissions=os.getenv("PERM_INHERIT_ADMIN_PERMISSIONS", "true").lower() == "true",
+            permission_cache_enabled=os.getenv("PERM_CACHE_ENABLED", "true").lower() == "true",
+            permission_cache_ttl=int(os.getenv("PERM_CACHE_TTL", "300"))
+        )
+    
     def _ensure_directories(self):
         """确保必要的目录存在"""
         directories = [
@@ -279,6 +373,20 @@ class Config:
         rag_validation = self.rag.validate()
         errors.extend(rag_validation["errors"])
         warnings.extend(rag_validation["warnings"])
+        
+        # 验证认证配置
+        if not self.auth.jwt_secret_key or self.auth.jwt_secret_key == "your_jwt_secret_key_here":
+            warnings.append("请设置JWT密钥 (AUTH_JWT_SECRET_KEY)")
+        
+        if self.auth.password_min_length < 6:
+            warnings.append("密码最小长度建议至少6位")
+        
+        if self.auth.session_timeout < 300:
+            warnings.append("会话超时时间过短，建议至少5分钟")
+        
+        # 验证权限配置
+        if self.permission.schema_isolation_enabled and not self.permission.default_schema_access:
+            warnings.append("启用schema隔离但未配置默认schema访问权限")
         
         # 验证路径配置
         if not os.path.exists(os.path.dirname(self.knowledge_base_path)):
