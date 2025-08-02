@@ -337,8 +337,7 @@ class AuthenticatedChatBIApp:
                 
         except Exception as e:
             return f"提交反馈异常: {str(e)}"
-de
-f create_authenticated_app() -> gr.Blocks:
+def create_authenticated_app() -> gr.Blocks:
     """创建带认证功能的ChatBI应用"""
     
     # 创建应用实例

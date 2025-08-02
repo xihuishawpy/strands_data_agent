@@ -81,11 +81,25 @@ class User:
         
         # 处理日期时间字段
         if data.get('created_at'):
-            user.created_at = datetime.fromisoformat(data['created_at'].replace('Z', '+00:00'))
+            created_at = data['created_at']
+            if isinstance(created_at, str):
+                user.created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            elif isinstance(created_at, datetime):
+                user.created_at = created_at
+                
         if data.get('updated_at'):
-            user.updated_at = datetime.fromisoformat(data['updated_at'].replace('Z', '+00:00'))
+            updated_at = data['updated_at']
+            if isinstance(updated_at, str):
+                user.updated_at = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+            elif isinstance(updated_at, datetime):
+                user.updated_at = updated_at
+                
         if data.get('last_login'):
-            user.last_login = datetime.fromisoformat(data['last_login'].replace('Z', '+00:00'))
+            last_login = data['last_login']
+            if isinstance(last_login, str):
+                user.last_login = datetime.fromisoformat(last_login.replace('Z', '+00:00'))
+            elif isinstance(last_login, datetime):
+                user.last_login = last_login
         
         user.login_count = data.get('login_count', 0)
         return user
@@ -117,7 +131,11 @@ class AllowedEmployee:
         allowed_employee.description = data.get('description')
         
         if data.get('added_at'):
-            allowed_employee.added_at = datetime.fromisoformat(data['added_at'].replace('Z', '+00:00'))
+            added_at = data['added_at']
+            if isinstance(added_at, str):
+                allowed_employee.added_at = datetime.fromisoformat(added_at.replace('Z', '+00:00'))
+            elif isinstance(added_at, datetime):
+                allowed_employee.added_at = added_at
         
         return allowed_employee
 
@@ -170,9 +188,17 @@ class UserPermission:
         
         # 处理日期时间字段
         if data.get('granted_at'):
-            permission.granted_at = datetime.fromisoformat(data['granted_at'].replace('Z', '+00:00'))
+            granted_at = data['granted_at']
+            if isinstance(granted_at, str):
+                permission.granted_at = datetime.fromisoformat(granted_at.replace('Z', '+00:00'))
+            elif isinstance(granted_at, datetime):
+                permission.granted_at = granted_at
         if data.get('expires_at'):
-            permission.expires_at = datetime.fromisoformat(data['expires_at'].replace('Z', '+00:00'))
+            expires_at = data['expires_at']
+            if isinstance(expires_at, str):
+                permission.expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            elif isinstance(expires_at, datetime):
+                permission.expires_at = expires_at
         
         return permission
 
@@ -234,11 +260,23 @@ class UserSession:
         
         # 处理日期时间字段
         if data.get('created_at'):
-            session.created_at = datetime.fromisoformat(data['created_at'].replace('Z', '+00:00'))
+            created_at = data['created_at']
+            if isinstance(created_at, str):
+                session.created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            elif isinstance(created_at, datetime):
+                session.created_at = created_at
         if data.get('expires_at'):
-            session.expires_at = datetime.fromisoformat(data['expires_at'].replace('Z', '+00:00'))
+            expires_at = data['expires_at']
+            if isinstance(expires_at, str):
+                session.expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            elif isinstance(expires_at, datetime):
+                session.expires_at = expires_at
         if data.get('last_activity'):
-            session.last_activity = datetime.fromisoformat(data['last_activity'].replace('Z', '+00:00'))
+            last_activity = data['last_activity']
+            if isinstance(last_activity, str):
+                session.last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+            elif isinstance(last_activity, datetime):
+                session.last_activity = last_activity
         
         return session
 
@@ -284,7 +322,11 @@ class AuditLog:
         log.user_agent = data.get('user_agent')
         
         if data.get('created_at'):
-            log.created_at = datetime.fromisoformat(data['created_at'].replace('Z', '+00:00'))
+            created_at = data['created_at']
+            if isinstance(created_at, str):
+                log.created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            elif isinstance(created_at, datetime):
+                log.created_at = created_at
         
         return log
 

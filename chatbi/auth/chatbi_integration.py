@@ -371,16 +371,28 @@ class AuthenticatedOrchestrator:
             
         except Exception as e:
             self.logger.warning(f"记录反馈审计日志失败: {str(e)}")
+    
+    def __getattr__(self, name):
+        """代理对基础orchestrator的属性访问"""
+        if hasattr(self.base_orchestrator, name):
+            return getattr(self.base_orchestrator, name)
+        else:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
 
 class ChatBIAuthIntegration:
     """ChatBI认证集成适配器"""
     
-    def __init__(self):
+    def __init__(self, database_config=None):
         """初始化集成适配器"""
-        self.session_manager = SessionManager()
-        self.permission_manager = PermissionManager()
-        self.auth_database = AuthDatabase()
+        # 如果没有提供数据库配置，使用默认配置
+        if database_config is None:
+            from chatbi.config import config
+            database_config = config.database
+            
+        self.auth_database = AuthDatabase(database_config)
+        self.session_manager = SessionManager(self.auth_database)
+        self.permission_manager = PermissionManager(self.auth_database)
         self.permission_filter = DatabasePermissionFilter(
             self.permission_manager, 
             self.auth_database
@@ -405,11 +417,11 @@ class ChatBIAuthIntegration:
             # 验证会话
             session_result = self.session_manager.validate_session(session_token)
             
-            if not session_result.valid:
+            if not session_result.success:
                 self.logger.warning(f"会话验证失败: {session_result.message}")
                 return None
             
-            user_id = session_result.user_id
+            user_id = session_result.session.user_id
             self.logger.info(f"为用户 {user_id} 创建认证包装器")
             
             # 创建认证包装器
@@ -609,12 +621,12 @@ class ChatBIAuthIntegration:
 # 全局集成适配器实例
 _integration_adapter: Optional[ChatBIAuthIntegration] = None
 
-def get_integration_adapter() -> ChatBIAuthIntegration:
+def get_integration_adapter(database_config=None) -> ChatBIAuthIntegration:
     """获取全局集成适配器实例"""
     global _integration_adapter
     
     if _integration_adapter is None:
-        _integration_adapter = ChatBIAuthIntegration()
+        _integration_adapter = ChatBIAuthIntegration(database_config)
     
     return _integration_adapter
 

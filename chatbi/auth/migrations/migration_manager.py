@@ -46,10 +46,44 @@ class MigrationManager:
         # 注册内置迁移
         self._register_builtin_migrations()
     
+    def _parse_sql_statements(self, sql_text: str) -> List[str]:
+        """
+        解析SQL文本，提取有效的SQL语句
+        
+        Args:
+            sql_text: 包含多个SQL语句的文本
+            
+        Returns:
+            List[str]: 有效的SQL语句列表
+        """
+        statements = []
+        
+        # 按分号分割
+        parts = sql_text.split(';')
+        
+        for part in parts:
+            # 移除注释和空白
+            lines = []
+            for line in part.split('\n'):
+                line = line.strip()
+                # 跳过空行和注释行
+                if line and not line.startswith('--') and not line.startswith('#'):
+                    lines.append(line)
+            
+            if lines:
+                # 重新组合成SQL语句
+                statement = ' '.join(lines).strip()
+                if statement:
+                    statements.append(statement)
+        
+        return statements
+    
     def _register_builtin_migrations(self):
         """注册内置迁移"""
-        from .create_auth_tables import create_auth_tables_migration
-        self.register_migration(create_auth_tables_migration)
+        from .create_auth_tables import create_migration_for_db_type
+        # 根据数据库类型创建对应的迁移
+        migration = create_migration_for_db_type(self.db_config.type)
+        self.register_migration(migration)
     
     def register_migration(self, migration: Migration):
         """注册迁移"""
@@ -177,15 +211,10 @@ class MigrationManager:
             
             self.logger.info(f"开始应用迁移: {migration.version} - {migration.name}")
             
-            # 执行迁移SQL
-            if self.db_config.type == "sqlite":
-                # SQLite需要逐条执行SQL语句
-                for sql_statement in migration.up_sql.split(';'):
-                    sql_statement = sql_statement.strip()
-                    if sql_statement:
-                        cursor.execute(sql_statement)
-            else:
-                cursor.execute(migration.up_sql)
+            # 执行迁移SQL - 所有数据库都逐条执行SQL语句
+            sql_statements = self._parse_sql_statements(migration.up_sql)
+            for sql_statement in sql_statements:
+                cursor.execute(sql_statement)
             
             # 记录迁移
             execution_time = int((datetime.now() - start_time).total_seconds() * 1000)
@@ -225,14 +254,10 @@ class MigrationManager:
             
             self.logger.info(f"开始回滚迁移: {migration.version} - {migration.name}")
             
-            # 执行回滚SQL
-            if self.db_config.type == "sqlite":
-                for sql_statement in migration.down_sql.split(';'):
-                    sql_statement = sql_statement.strip()
-                    if sql_statement:
-                        cursor.execute(sql_statement)
-            else:
-                cursor.execute(migration.down_sql)
+            # 执行回滚SQL - 所有数据库都逐条执行SQL语句
+            sql_statements = self._parse_sql_statements(migration.down_sql)
+            for sql_statement in sql_statements:
+                cursor.execute(sql_statement)
             
             # 删除迁移记录
             delete_sql = "DELETE FROM auth_migrations WHERE version = %s"

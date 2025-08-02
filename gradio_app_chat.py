@@ -49,17 +49,33 @@ class ChatBIApp:
             from chatbi.config import config
             from chatbi.auth.config import get_auth_config
             
+            print("🔧 正在初始化认证系统...")
+            
             # 使用主配置中的数据库配置
             database_config = config.database
+            print(f"📊 数据库配置: {database_config.host}:{database_config.port}/{database_config.database}")
+            
             self.auth_database = AuthDatabase(database_config)
+            print("✅ 认证数据库初始化成功")
+            
             self.user_manager = UserManager(self.auth_database)
+            print("✅ 用户管理器初始化成功")
+            
             self.session_manager = SessionManager(self.auth_database)
-            self.integration_adapter = get_integration_adapter()
+            print("✅ 会话管理器初始化成功")
+            
+            self.integration_adapter = get_integration_adapter(database_config)
+            print("✅ 集成适配器初始化成功")
+            
+            print("🎉 认证系统初始化完成")
+            
         except Exception as e:
             # 如果认证组件初始化失败，设置为None
             import logging
             logger = logging.getLogger(__name__)
-            logger.warning(f"认证组件初始化失败: {str(e)}")
+            logger.error(f"认证组件初始化失败: {str(e)}")
+            print(f"❌ 认证组件初始化失败: {str(e)}")
+            traceback.print_exc()
             self.auth_database = None
             self.user_manager = None
             self.session_manager = None
@@ -122,7 +138,7 @@ class ChatBIApp:
             
             # 设置当前用户和会话
             self.current_user = auth_result.user
-            self.current_session_token = session_result.token
+            self.current_session_token = session_result.session_token
             
             # 创建认证包装器
             self.authenticated_orchestrator = self.integration_adapter.wrap_orchestrator(
@@ -156,7 +172,7 @@ class ChatBIApp:
         try:
             if self.current_session_token and self.session_manager:
                 # 销毁会话
-                self.session_manager.invalidate_session(self.current_session_token)
+                self.session_manager.destroy_session(self.current_session_token)
             
             # 清除状态
             self.current_user = None
@@ -647,8 +663,13 @@ class ChatBIApp:
     def handle_query_with_feedback(self, question: str) -> Tuple[str, str, bool]:
         """处理查询并提供反馈机制的完整流程"""
         try:
+            # 使用认证后的orchestrator或基础orchestrator
+            orchestrator = self.authenticated_orchestrator or self.base_orchestrator
+            if not orchestrator:
+                return "❌ 系统未初始化，请稍后重试"
+            
             # 执行查询
-            result = self.orchestrator.query(
+            result = orchestrator.query(
                 question=question,
                 auto_visualize=True,
                 analysis_level="standard"
@@ -762,7 +783,12 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
     def get_knowledge_table(self) -> pd.DataFrame:
         """获取知识库表格数据"""
         try:
-            items = self.orchestrator.knowledge_manager.get_all_knowledge_items()
+            # 使用认证后的orchestrator或基础orchestrator
+            orchestrator = self.authenticated_orchestrator or self.base_orchestrator
+            if not orchestrator:
+                return pd.DataFrame(columns=['ID', '问题', 'SQL查询', '描述', '标签', '评分', '使用次数', '创建时间'])
+            
+            items = orchestrator.knowledge_manager.get_all_knowledge_items()
             
             if not items:
                 return pd.DataFrame(columns=['ID', '问题', 'SQL查询', '描述', '标签', '评分', '使用次数', '创建时间'])
@@ -791,6 +817,8 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
             return df
             
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
             logger.error(f"获取知识库表格失败: {str(e)}")
             return pd.DataFrame(columns=['ID', '问题', 'SQL查询', '描述', '标签', '评分', '使用次数', '创建时间'])
     
@@ -800,10 +828,15 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
             return "❌ 问题和SQL查询不能为空"
         
         try:
+            # 使用认证后的orchestrator或基础orchestrator
+            orchestrator = self.authenticated_orchestrator or self.base_orchestrator
+            if not orchestrator:
+                return "❌ 系统未初始化，请稍后重试"
+            
             # 解析标签
             tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()] if tags else []
             
-            success = self.orchestrator.knowledge_manager.add_knowledge_item(
+            success = orchestrator.knowledge_manager.add_knowledge_item(
                 question=question.strip(),
                 sql=sql.strip(),
                 description=description.strip(),
@@ -826,10 +859,15 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
             return "❌ ID、问题和SQL查询不能为空"
         
         try:
+            # 使用认证后的orchestrator或基础orchestrator
+            orchestrator = self.authenticated_orchestrator or self.base_orchestrator
+            if not orchestrator:
+                return "❌ 系统未初始化，请稍后重试"
+            
             # 解析标签
             tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()] if tags else []
             
-            success = self.orchestrator.knowledge_manager.update_knowledge_item(
+            success = orchestrator.knowledge_manager.update_knowledge_item(
                 item_id=item_id,
                 question=question.strip(),
                 sql=sql.strip(),
@@ -851,7 +889,12 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
             return "❌ 请提供条目ID"
         
         try:
-            success = self.orchestrator.knowledge_manager.delete_knowledge_item(item_id)
+            # 使用认证后的orchestrator或基础orchestrator
+            orchestrator = self.authenticated_orchestrator or self.base_orchestrator
+            if not orchestrator:
+                return "❌ 系统未初始化，请稍后重试"
+            
+            success = orchestrator.knowledge_manager.delete_knowledge_item(item_id)
             
             if success:
                 return "✅ 知识库条目删除成功"
@@ -864,7 +907,12 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
     def get_knowledge_item_by_id(self, item_id: str) -> tuple:
         """根据ID获取知识库条目详情"""
         try:
-            items = self.orchestrator.knowledge_manager.get_all_knowledge_items()
+            # 使用认证后的orchestrator或基础orchestrator
+            orchestrator = self.authenticated_orchestrator or self.base_orchestrator
+            if not orchestrator:
+                return None
+            
+            items = orchestrator.knowledge_manager.get_all_knowledge_items()
             
             for item in items:
                 if item['id'] == item_id:
@@ -885,11 +933,16 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
     def export_knowledge_base(self) -> Tuple[str, str]:
         """导出知识库数据"""
         try:
-            if not self.orchestrator.knowledge_manager.enabled:
+            # 使用认证后的orchestrator或基础orchestrator
+            orchestrator = self.authenticated_orchestrator or self.base_orchestrator
+            if not orchestrator:
+                return "❌ 导出失败", "系统未初始化"
+            
+            if not orchestrator.knowledge_manager.enabled:
                 return "❌ 导出失败", "知识库未启用"
             
             # 获取所有知识库条目
-            items = self.orchestrator.knowledge_manager.get_all_knowledge_items()
+            items = orchestrator.knowledge_manager.get_all_knowledge_items()
             
             if not items:
                 return "⚠️ 无数据", "知识库中没有数据可导出"
@@ -913,7 +966,12 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
     def import_knowledge_base(self, json_data: str) -> str:
         """导入知识库数据"""
         try:
-            if not self.orchestrator.knowledge_manager.enabled:
+            # 使用认证后的orchestrator或基础orchestrator
+            orchestrator = self.authenticated_orchestrator or self.base_orchestrator
+            if not orchestrator:
+                return "❌ 系统未初始化，无法导入数据"
+            
+            if not orchestrator.knowledge_manager.enabled:
                 return "❌ 知识库未启用，无法导入数据"
             
             if not json_data.strip():
@@ -945,7 +1003,7 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
                         continue
                     
                     # 添加到知识库
-                    success = self.orchestrator.knowledge_manager.add_positive_feedback(
+                    success = orchestrator.knowledge_manager.add_positive_feedback(
                         question=item['question'],
                         sql=item['sql'],
                         description=item.get('description', '导入的知识库条目'),
@@ -978,394 +1036,6 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
                 
         except Exception as e:
             return f"❌ 导入失败: {str(e)}"
-
-
-def create_authenticated_chatbi_app() -> gr.Blocks:
-    """创建带认证功能的ChatBI应用"""
-    
-    # 创建应用实例
-    app = ChatBIApp()
-    
-    # 自定义CSS样式
-    custom_css = """
-    .user-info-box {
-        background-color: #f0f8ff;
-        border: 1px solid #4CAF50;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 10px 0;
-    }
-    .login-box {
-        background-color: #fff8dc;
-        border: 1px solid #ffa500;
-        border-radius: 8px;
-        padding: 15px;
-        margin: 10px 0;
-    }
-    .error-message {
-        color: #d32f2f;
-        font-weight: bold;
-    }
-    .success-message {
-        color: #388e3c;
-        font-weight: bold;
-    }
-    """
-    
-    with gr.Blocks(
-        title="ChatBI 智能数据查询系统",
-        theme=gr.themes.Soft(),
-        css=custom_css
-    ) as demo:
-        
-        # 应用状态
-        user_state = gr.State({})
-        login_state = gr.State(False)
-        
-        # 标题
-        gr.Markdown("# 🤖 ChatBI 智能数据查询系统")
-        gr.Markdown("基于自然语言的智能数据分析平台，支持用户认证和权限管理")
-        
-        # 用户信息显示区域
-        with gr.Row():
-            user_info_display = gr.Markdown("", elem_classes=["user-info-box"], visible=False)
-        
-        # 主要内容区域
-        with gr.Tab("💬 智能查询") as chat_tab:
-            with gr.Row():
-                with gr.Column(scale=3):
-                    # 聊天界面
-                    chatbot = gr.Chatbot(
-                        label="ChatBI 对话",
-                        height=500,
-                        show_label=True,
-                        container=True,
-                        bubble_full_width=False
-                    )
-                    
-                    # 输入区域
-                    with gr.Row():
-                        msg_input = gr.Textbox(
-                            label="输入您的问题",
-                            placeholder="例如：显示最近一周的销售数据（请先登录）",
-                            scale=4,
-                            container=False
-                        )
-                        send_btn = gr.Button("发送", variant="primary", scale=1)
-                    
-                    # 查询选项
-                    with gr.Row():
-                        auto_viz_checkbox = gr.Checkbox(
-                            label="自动生成可视化",
-                            value=True
-                        )
-                        enable_analysis_checkbox = gr.Checkbox(
-                            label="启用数据分析",
-                            value=True
-                        )
-                        analysis_level_dropdown = gr.Dropdown(
-                            label="分析级别",
-                            choices=["basic", "standard", "detailed"],
-                            value="standard"
-                        )
-                
-                with gr.Column(scale=1):
-                    # 可视化显示区域
-                    plot_output = gr.Plot(
-                        label="数据可视化",
-                        visible=True
-                    )
-                    
-                    # 反馈区域
-                    gr.Markdown("### 📝 查询反馈")
-                    feedback_description = gr.Textbox(
-                        label="反馈描述（可选）",
-                        placeholder="请描述您对查询结果的看法"
-                    )
-                    
-                    with gr.Row():
-                        like_btn = gr.Button("👍 点赞", variant="secondary")
-                        feedback_output = gr.Textbox(
-                            label="反馈状态",
-                            interactive=False,
-                            max_lines=2
-                        )
-        
-        # 登录/注册标签页
-        with gr.Tab("🔐 用户认证") as auth_tab:
-            with gr.Row():
-                # 登录区域
-                with gr.Column(scale=1):
-                    gr.Markdown("### 用户登录")
-                    
-                    login_employee_id = gr.Textbox(
-                        label="工号",
-                        placeholder="请输入您的工号"
-                    )
-                    login_password = gr.Textbox(
-                        label="密码",
-                        type="password",
-                        placeholder="请输入密码"
-                    )
-                    
-                    with gr.Row():
-                        login_btn = gr.Button("登录", variant="primary")
-                        logout_btn = gr.Button("登出", variant="secondary", visible=False)
-                    
-                    login_message = gr.Textbox(
-                        label="登录状态",
-                        interactive=False,
-                        max_lines=3
-                    )
-                
-                # 注册区域
-                with gr.Column(scale=1):
-                    gr.Markdown("### 用户注册")
-                    
-                    reg_employee_id = gr.Textbox(
-                        label="工号",
-                        placeholder="请输入您的工号"
-                    )
-                    reg_password = gr.Textbox(
-                        label="密码",
-                        type="password",
-                        placeholder="请输入密码"
-                    )
-                    reg_confirm_password = gr.Textbox(
-                        label="确认密码",
-                        type="password",
-                        placeholder="请再次输入密码"
-                    )
-                    reg_email = gr.Textbox(
-                        label="邮箱（可选）",
-                        placeholder="请输入邮箱地址"
-                    )
-                    reg_full_name = gr.Textbox(
-                        label="姓名（可选）",
-                        placeholder="请输入您的姓名"
-                    )
-                    
-                    register_btn = gr.Button("注册", variant="primary")
-                    register_message = gr.Textbox(
-                        label="注册状态",
-                        interactive=False,
-                        max_lines=3
-                    )
-        
-        # 系统信息标签页
-        with gr.Tab("ℹ️ 系统信息") as info_tab:
-            gr.Markdown("### 系统状态")
-            
-            with gr.Row():
-                test_conn_btn = gr.Button("测试数据库连接")
-                refresh_schema_btn = gr.Button("刷新Schema缓存")
-                get_schema_btn = gr.Button("获取Schema信息")
-            
-            system_status = gr.Textbox(
-                label="系统状态",
-                interactive=False,
-                max_lines=10
-            )
-            
-            gr.Markdown("### 知识库信息")
-            knowledge_stats_btn = gr.Button("获取知识库统计")
-            knowledge_stats_output = gr.Textbox(
-                label="知识库统计",
-                interactive=False,
-                max_lines=15
-            )
-            
-            gr.Markdown("### 使用说明")
-            gr.Markdown("""
-            **使用步骤：**
-            1. 在"用户认证"标签页中登录或注册账户
-            2. 登录成功后，在"智能查询"标签页中输入自然语言问题
-            3. 系统会根据您的权限自动过滤可访问的数据
-            4. 查看查询结果和可视化图表
-            5. 可以对查询结果进行反馈
-            
-            **权限说明：**
-            - 不同用户具有不同的数据库访问权限
-            - 系统会自动过滤您无权访问的数据
-            - 如有权限问题，请联系管理员
-            
-            **注意事项：**
-            - 请妥善保管您的登录凭据
-            - 定期更换密码以确保账户安全
-            - 如遇问题请及时联系技术支持
-            """)
-        
-        # 事件处理函数
-        def handle_login(employee_id, password):
-            """处理登录"""
-            success, message, user_info = app.login_user(employee_id, password)
-            
-            if success:
-                # 更新界面状态
-                user_display = f"""
-                **当前用户:** {user_info['employee_id']} ({user_info['full_name']})
-                **邮箱:** {user_info['email']}
-                **管理员:** {'是' if user_info['is_admin'] else '否'}
-                **登录时间:** {user_info['login_time']}
-                """
-                
-                return (
-                    True,  # login_state
-                    user_info,  # user_state
-                    user_display,  # user_info_display
-                    True,  # user_info_display visible
-                    message,  # login_message
-                    "",  # clear employee_id
-                    "",  # clear password
-                    gr.update(visible=False),  # login_btn
-                    gr.update(visible=True),   # logout_btn
-                    "例如：显示最近一周的销售数据"  # update placeholder
-                )
-            else:
-                return (
-                    False,  # login_state
-                    {},  # user_state
-                    "",  # user_info_display
-                    False,  # user_info_display visible
-                    message,  # login_message
-                    employee_id,  # keep employee_id
-                    "",  # clear password
-                    gr.update(visible=True),   # login_btn
-                    gr.update(visible=False),  # logout_btn
-                    "例如：显示最近一周的销售数据（请先登录）"  # keep placeholder
-                )
-        
-        def handle_logout():
-            """处理登出"""
-            success, message = app.logout_user()
-            
-            return (
-                False,  # login_state
-                {},  # user_state
-                "",  # user_info_display
-                False,  # user_info_display visible
-                message,  # login_message
-                "",  # clear employee_id
-                "",  # clear password
-                gr.update(visible=True),   # login_btn
-                gr.update(visible=False),  # logout_btn
-                "例如：显示最近一周的销售数据（请先登录）",  # update placeholder
-                []  # clear chatbot
-            )
-        
-        def handle_register(employee_id, password, confirm_password, email, full_name):
-            """处理注册"""
-            success, message = app.register_user(
-                employee_id, password, confirm_password, email, full_name
-            )
-            
-            if success:
-                return message, "", "", "", "", ""  # clear all fields
-            else:
-                return message, employee_id, "", "", email, full_name  # keep non-password fields
-        
-        def handle_chat(message, history, auto_viz, enable_analysis, analysis_level):
-            """处理聊天查询"""
-            if not app.is_authenticated():
-                history.append([message, "❌ 请先登录后再进行查询"])
-                return history, "", None
-            
-            # 使用生成器处理流式响应
-            for result in app.chat_query(message, history, auto_viz, enable_analysis, analysis_level):
-                yield result
-        
-        def handle_feedback(description):
-            """处理反馈"""
-            result = app.add_positive_feedback(description)
-            return result, ""  # clear description
-        
-        def handle_test_connection():
-            """处理数据库连接测试"""
-            status, info = app.test_connection()
-            return f"{status}\n\n{info}"
-        
-        def handle_refresh_schema():
-            """处理Schema刷新"""
-            status, info = app.refresh_schema()
-            return f"{status}\n\n{info}"
-        
-        def handle_get_schema():
-            """处理获取Schema信息"""
-            status, info = app.get_schema_info()
-            return f"{status}\n\n{info}"
-        
-        def handle_knowledge_stats():
-            """处理获取知识库统计"""
-            return app.get_knowledge_stats()
-        
-        # 绑定事件
-        login_btn.click(
-            handle_login,
-            inputs=[login_employee_id, login_password],
-            outputs=[
-                login_state, user_state, user_info_display, user_info_display,
-                login_message, login_employee_id, login_password,
-                login_btn, logout_btn, msg_input
-            ]
-        )
-        
-        logout_btn.click(
-            handle_logout,
-            outputs=[
-                login_state, user_state, user_info_display, user_info_display,
-                login_message, login_employee_id, login_password,
-                login_btn, logout_btn, msg_input, chatbot
-            ]
-        )
-        
-        register_btn.click(
-            handle_register,
-            inputs=[reg_employee_id, reg_password, reg_confirm_password, reg_email, reg_full_name],
-            outputs=[register_message, reg_employee_id, reg_password, reg_confirm_password, reg_email, reg_full_name]
-        )
-        
-        # 聊天事件
-        send_btn.click(
-            handle_chat,
-            inputs=[msg_input, chatbot, auto_viz_checkbox, enable_analysis_checkbox, analysis_level_dropdown],
-            outputs=[chatbot, msg_input, plot_output]
-        )
-        
-        msg_input.submit(
-            handle_chat,
-            inputs=[msg_input, chatbot, auto_viz_checkbox, enable_analysis_checkbox, analysis_level_dropdown],
-            outputs=[chatbot, msg_input, plot_output]
-        )
-        
-        # 反馈事件
-        like_btn.click(
-            handle_feedback,
-            inputs=[feedback_description],
-            outputs=[feedback_output, feedback_description]
-        )
-        
-        # 系统信息事件
-        test_conn_btn.click(
-            handle_test_connection,
-            outputs=[system_status]
-        )
-        
-        refresh_schema_btn.click(
-            handle_refresh_schema,
-            outputs=[system_status]
-        )
-        
-        get_schema_btn.click(
-            handle_get_schema,
-            outputs=[system_status]
-        )
-        
-        knowledge_stats_btn.click(
-            handle_knowledge_stats,
-            outputs=[knowledge_stats_output]
-        )
-    
-    return demo
 
     # 系统管理功能
     def test_connection(self) -> Tuple[str, str]:
@@ -1880,6 +1550,823 @@ def create_authenticated_chatbi_app() -> gr.Blocks:
                 
         except Exception as e:
             return pd.DataFrame(), f"加载表信息失败: {str(e)}"
+
+
+def create_authenticated_chatbi_app() -> gr.Blocks:
+    """创建带认证功能的ChatBI应用"""
+    
+    # 创建应用实例
+    app = ChatBIApp()
+    
+    # 自定义CSS样式
+    custom_css = """
+    .user-info-box {
+        background-color: #f0f8ff;
+        border: 1px solid #4CAF50;
+        border-radius: 8px;
+        padding: 10px;
+        margin: 10px 0;
+    }
+    .login-box {
+        background-color: #fff8dc;
+        border: 1px solid #ffa500;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+    }
+    .error-message {
+        color: #d32f2f;
+        font-weight: bold;
+    }
+    .success-message {
+        color: #388e3c;
+        font-weight: bold;
+    }
+    """
+    
+    with gr.Blocks(
+        title="ChatBI 智能数据查询系统",
+        theme=gr.themes.Soft(),
+        css=custom_css
+    ) as demo:
+        
+        # 应用状态
+        user_state = gr.State({})
+        login_state = gr.State(False)
+        
+        # 标题
+        gr.Markdown("# 🤖 ChatBI 智能数据查询系统")
+        gr.Markdown("基于自然语言的智能数据分析平台，支持用户认证和权限管理")
+        
+        # 用户信息显示区域
+        with gr.Row():
+            user_info_display = gr.Markdown("", elem_classes=["user-info-box"], visible=False)
+        
+        # 主要内容区域
+        with gr.Tab("💬 智能查询") as chat_tab:
+            with gr.Row():
+                with gr.Column(scale=3):
+                    # 聊天界面
+                    chatbot = gr.Chatbot(
+                        label="ChatBI 对话",
+                        height=500,
+                        show_label=True,
+                        container=True,
+                        bubble_full_width=False
+                    )
+                    
+                    # 输入区域
+                    with gr.Row():
+                        msg_input = gr.Textbox(
+                            label="输入您的问题",
+                            placeholder="例如：显示不同物料的预算情况（请先登录）",
+                            scale=4,
+                            container=False
+                        )
+                        send_btn = gr.Button("发送", variant="primary", scale=1)
+                    
+                    # 查询选项
+                    with gr.Row():
+                        auto_viz_checkbox = gr.Checkbox(
+                            label="自动生成可视化",
+                            value=True
+                        )
+                        enable_analysis_checkbox = gr.Checkbox(
+                            label="启用数据分析",
+                            value=True
+                        )
+                        analysis_level_dropdown = gr.Dropdown(
+                            label="分析级别",
+                            choices=["basic", "standard", "detailed"],
+                            value="standard"
+                        )
+                
+                with gr.Column(scale=1):
+                    # 可视化显示区域
+                    plot_output = gr.Plot(
+                        label="数据可视化",
+                        visible=True
+                    )
+                    
+                    # 反馈区域
+                    gr.Markdown("### 📝 查询反馈")
+                    feedback_description = gr.Textbox(
+                        label="反馈描述（可选）",
+                        placeholder="请描述您对查询结果的看法"
+                    )
+                    
+                    with gr.Row():
+                        like_btn = gr.Button("👍 点赞", variant="secondary")
+                        feedback_output = gr.Textbox(
+                            label="反馈状态",
+                            interactive=False,
+                            max_lines=2
+                        )
+        
+        # 登录/注册标签页
+        with gr.Tab("🔐 用户认证") as auth_tab:
+            with gr.Row():
+                # 登录区域
+                with gr.Column(scale=1):
+                    gr.Markdown("### 用户登录")
+                    
+                    login_employee_id = gr.Textbox(
+                        label="工号",
+                        placeholder="请输入您的工号"
+                    )
+                    login_password = gr.Textbox(
+                        label="密码",
+                        type="password",
+                        placeholder="请输入密码"
+                    )
+                    
+                    with gr.Row():
+                        login_btn = gr.Button("登录", variant="primary")
+                        logout_btn = gr.Button("登出", variant="secondary", visible=False)
+                    
+                    login_message = gr.Textbox(
+                        label="登录状态",
+                        interactive=False,
+                        max_lines=3
+                    )
+                
+                # 注册区域
+                with gr.Column(scale=1):
+                    gr.Markdown("### 用户注册")
+                    
+                    reg_employee_id = gr.Textbox(
+                        label="工号",
+                        placeholder="请输入您的工号"
+                    )
+                    reg_password = gr.Textbox(
+                        label="密码",
+                        type="password",
+                        placeholder="请输入密码"
+                    )
+                    reg_confirm_password = gr.Textbox(
+                        label="确认密码",
+                        type="password",
+                        placeholder="请再次输入密码"
+                    )
+                    reg_email = gr.Textbox(
+                        label="邮箱（可选）",
+                        placeholder="请输入邮箱地址"
+                    )
+                    reg_full_name = gr.Textbox(
+                        label="姓名（可选）",
+                        placeholder="请输入您的姓名"
+                    )
+                    
+                    register_btn = gr.Button("注册", variant="primary")
+                    register_message = gr.Textbox(
+                        label="注册状态",
+                        interactive=False,
+                        max_lines=3
+                    )
+        
+        # SQL知识库管理标签页
+        with gr.Tab("🐬 SQL知识库") as knowledge_tab:
+            gr.Markdown("""
+            ## 🌿 SQL知识库管理
+            
+            通过RAG技术提升SQL生成的准确性和一致性。
+            """)
+            
+            with gr.Row():
+                with gr.Column():
+                    # 知识库表格管理
+                    gr.Markdown("### 📊 知识库条目管理")
+                    with gr.Row():
+                        refresh_table_btn = gr.Button("🔄 刷新表格", variant="secondary", size="sm")
+                        add_new_btn = gr.Button("➕ 添加新条目", variant="primary", size="sm")
+                    
+                    knowledge_table = gr.Dataframe(
+                        headers=['ID', '问题', 'SQL查询', '描述', '标签', '评分', '使用次数', '创建时间'],
+                        datatype=['str', 'str', 'str', 'str', 'str', 'number', 'number', 'str'],
+                        interactive=False,
+                        wrap=True
+                    )
+                    
+                    # 编辑面板
+                    gr.Markdown("### ✏️ 编辑条目")
+                    
+                    selected_id = gr.Textbox(
+                        label="条目ID",
+                        placeholder="从表格中选择条目后自动填充",
+                        interactive=False
+                    )
+                    
+                    with gr.Row():
+                        with gr.Column():
+                            edit_question = gr.Textbox(
+                                label="问题",
+                                placeholder="输入自然语言问题",
+                                lines=2
+                            )
+                            
+                            edit_sql = gr.Textbox(
+                                label="SQL查询",
+                                placeholder="输入SQL查询语句",
+                                lines=3
+                            )
+                        
+                        with gr.Column():
+                            edit_description = gr.Textbox(
+                                label="描述",
+                                placeholder="输入查询描述（可选）",
+                                lines=2
+                            )
+                            
+                            edit_tags = gr.Textbox(
+                                label="标签",
+                                placeholder="输入标签，用逗号分隔",
+                                lines=1
+                            )
+                    
+                    with gr.Row():
+                        update_btn = gr.Button("💾 更新", variant="primary", size="sm")
+                        delete_btn = gr.Button("🗑️ 删除", variant="stop", size="sm")
+                    
+                    edit_result = gr.Markdown("")
+                    
+                    # 添加新条目面板
+                    gr.Markdown("### ➕ 添加新条目")
+                    
+                    with gr.Row():
+                        with gr.Column():
+                            new_question = gr.Textbox(
+                                label="问题",
+                                placeholder="输入自然语言问题",
+                                lines=2
+                            )
+                            
+                            new_sql = gr.Textbox(
+                                label="SQL查询",
+                                placeholder="输入SQL查询语句",
+                                lines=3
+                            )
+                        
+                        with gr.Column():
+                            new_description = gr.Textbox(
+                                label="描述",
+                                placeholder="输入查询描述（可选）",
+                                lines=2
+                            )
+                            
+                            new_tags = gr.Textbox(
+                                label="标签",
+                                placeholder="输入标签，用逗号分隔（可选）",
+                                lines=1
+                            )
+                    
+                    add_btn = gr.Button("➕ 添加到知识库", variant="primary")
+                    add_result = gr.Markdown("")
+                    
+                    # 知识库统计
+                    gr.Markdown("### 📊 知识库统计")
+                    refresh_stats_btn = gr.Button("🔄 刷新统计", variant="secondary")
+                    knowledge_stats = gr.Markdown("点击'刷新统计'查看知识库状态")
+                    
+                    # 数据导入导出
+                    gr.Markdown("### 📤 数据导入导出")
+                    
+                    with gr.Row():
+                        with gr.Column():
+                            gr.Markdown("**📤 导出知识库**")
+                            export_kb_btn = gr.Button("📤 导出知识库", variant="secondary", size="sm")
+                            export_kb_status = gr.Textbox(label="导出状态", interactive=False, lines=1)
+                            export_kb_data = gr.Textbox(
+                                label="导出数据",
+                                lines=8,
+                                interactive=False,
+                                placeholder="导出的JSON数据将显示在这里，可复制保存"
+                            )
+                        
+                        with gr.Column():
+                            gr.Markdown("**📥 导入知识库**")
+                            import_kb_data = gr.Textbox(
+                                label="导入数据",
+                                lines=8,
+                                placeholder="请粘贴要导入的JSON数据"
+                            )
+                            import_kb_btn = gr.Button("📥 导入知识库", variant="primary", size="sm")
+                            import_kb_status = gr.Textbox(label="导入状态", interactive=False, lines=1)
+                    
+                    # 使用说明
+                    gr.Markdown("""
+                    ### 💡 使用说明
+                    
+                    **如何使用知识库功能：**
+                    1. 在对话界面进行查询
+                    2. 如果结果满意，点击"👍 添加到知识库"按钮
+                    3. 可选择添加描述信息，帮助系统更好地理解查询用途
+                    4. 系统会自动学习，提升后续相似查询的准确性
+                    
+                    **RAG工作原理：**
+                    - 🔍 **智能检索**: 自动搜索相似的历史查询
+                    - 🎯 **策略选择**: 根据相似度选择最佳生成策略
+                    - 📈 **持续改进**: 基于用户反馈不断优化
+                    - 🚀 **性能提升**: 减少重复生成，提高响应速度
+                    """)
+
+        # 表信息维护标签页
+        with gr.Tab("📝 表信息维护") as metadata_tab:
+            gr.Markdown("""
+            ## 📝 表信息维护
+            
+            通过维护表和字段的业务信息，提高SQL生成的准确率和可理解性。
+            """)
+            
+            with gr.Tabs():
+                # 表信息管理
+                with gr.TabItem("📊 表信息管理"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            gr.Markdown("### 选择表")
+                            table_dropdown = gr.Dropdown(
+                                label="选择表",
+                                choices=app.get_table_list(),
+                                interactive=True,
+                                allow_custom_value=False
+                            )
+                            
+                            load_table_btn = gr.Button("加载表信息", variant="primary")
+                            table_status = gr.Textbox(label="状态", interactive=False)
+                        
+                        with gr.Column(scale=2):
+                            gr.Markdown("### 表元数据")
+                            
+                            table_business_name = gr.Textbox(
+                                label="业务名称",
+                                placeholder="例如：用户信息表",
+                                lines=1
+                            )
+                            
+                            table_description = gr.Textbox(
+                                label="表描述",
+                                placeholder="例如：存储系统用户的基本信息",
+                                lines=2
+                            )
+                            
+                            table_business_meaning = gr.Textbox(
+                                label="业务含义",
+                                placeholder="例如：记录注册用户的详细资料，包括个人信息和账户状态",
+                                lines=3
+                            )
+                            
+                            table_category = gr.Textbox(
+                                label="业务分类",
+                                placeholder="例如：用户管理、基础数据",
+                                lines=1
+                            )
+                            
+                            save_table_btn = gr.Button("保存表信息", variant="primary")
+                
+                # 字段信息管理
+                with gr.TabItem("🏷️ 字段信息管理"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            gr.Markdown("### 表选择与操作")
+                            
+                            column_table_dropdown = gr.Dropdown(
+                                label="选择表",
+                                choices=app.get_table_list(),
+                                interactive=True,
+                                allow_custom_value=False
+                            )
+                            
+                            with gr.Row():
+                                load_columns_btn = gr.Button("📋 加载字段", variant="primary", size="sm")
+                                refresh_examples_btn = gr.Button("🔄 刷新示例", variant="secondary", size="sm")
+                            
+                            column_status = gr.Textbox(label="操作状态", interactive=False, lines=3)
+                            
+                            gr.Markdown("### 💡 使用说明")
+                            gr.Markdown("""
+                            **操作步骤：**
+                            1. 选择要管理的表
+                            2. 点击"📋 加载字段"获取字段列表和数据库备注
+                            3. 点击"🔄 刷新示例"自动获取真实数据示例
+                            4. 直接在表格中编辑字段元数据信息
+                            5. 修改后自动保存到本地缓存和数据库
+                            
+                            **字段说明：**
+                            - **字段名**：数据库字段名（只读）
+                            - **数据类型**：字段数据类型（只读）
+                            - **业务名称**：字段的中文业务名称
+                            - **字段描述**：会同步更新到数据库字段备注
+                            - **业务含义**：字段在业务场景中的具体含义
+                            - **数据示例**：自动从数据库获取的真实数据样例
+                            
+                            **重要提示：**
+                            - 字段描述会同时更新数据库的COMMENT信息
+                            - 所有元数据会用于AI生成SQL时的参考
+                            - 建议填写准确、详细的业务信息以提高查询效果
+                            """)
+                        
+                        with gr.Column(scale=3):
+                            gr.Markdown("### 📊 字段元数据管理")
+                            gr.Markdown("*在下方表格中直接编辑字段信息，修改后会自动保存到系统中*")
+                            
+                            columns_dataframe = gr.Dataframe(
+                                headers=["字段名", "数据类型", "业务名称", "字段描述", "业务含义", "数据示例"],
+                                datatype=["str", "str", "str", "str", "str", "str"],
+                                interactive=True,
+                                wrap=True,
+                                label="字段信息表格"
+                            )
+                
+                # 数据导入导出
+                with gr.TabItem("📤 数据管理"):
+                    with gr.Row():
+                        with gr.Column():
+                            gr.Markdown("### 📤 导出元数据")
+                            export_btn = gr.Button("导出元数据", variant="primary")
+                            export_status = gr.Textbox(label="导出状态", interactive=False)
+                            export_data = gr.Textbox(
+                                label="导出数据",
+                                lines=10,
+                                interactive=False,
+                                placeholder="导出的JSON数据将显示在这里"
+                            )
+                        
+                        with gr.Column():
+                            gr.Markdown("### 📥 导入元数据")
+                            import_data = gr.Textbox(
+                                label="导入数据",
+                                lines=10,
+                                placeholder="请粘贴要导入的JSON数据"
+                            )
+                            import_btn = gr.Button("导入元数据", variant="primary")
+                            import_status = gr.Textbox(label="导入状态", interactive=False)
+
+        # 系统信息标签页
+        with gr.Tab("ℹ️ 系统信息") as info_tab:
+            gr.Markdown("### 系统状态")
+            
+            with gr.Row():
+                test_conn_btn = gr.Button("测试数据库连接")
+                refresh_schema_btn = gr.Button("刷新Schema缓存")
+                get_schema_btn = gr.Button("获取Schema信息")
+            
+            system_status = gr.Textbox(
+                label="系统状态",
+                interactive=False,
+                max_lines=10
+            )
+            
+            gr.Markdown("### 知识库信息")
+            knowledge_stats_btn = gr.Button("获取知识库统计")
+            knowledge_stats_output = gr.Textbox(
+                label="知识库统计",
+                interactive=False,
+                max_lines=15
+            )
+            
+            gr.Markdown("### 使用说明")
+            gr.Markdown("""
+            **使用步骤：**
+            1. 在"用户认证"标签页中登录或注册账户
+            2. 登录成功后，在"智能查询"标签页中输入自然语言问题
+            3. 系统会根据您的权限自动过滤可访问的数据
+            4. 查看查询结果和可视化图表
+            5. 可以对查询结果进行反馈
+            
+            **权限说明：**
+            - 不同用户具有不同的数据库访问权限
+            - 系统会自动过滤您无权访问的数据
+            - 如有权限问题，请联系管理员
+            
+            **注意事项：**
+            - 请妥善保管您的登录凭据
+            - 定期更换密码以确保账户安全
+            - 如遇问题请及时联系技术支持
+            """)
+        
+        # 事件处理函数
+        def handle_login(employee_id, password):
+            """处理登录"""
+            success, message, user_info = app.login_user(employee_id, password)
+            
+            if success:
+                # 更新界面状态
+                user_display = f"""
+                **当前用户:** {user_info['employee_id']} ({user_info['full_name']})
+                **邮箱:** {user_info['email']}
+                **管理员:** {'是' if user_info['is_admin'] else '否'}
+                **登录时间:** {user_info['login_time']}
+                """
+                
+                return (
+                    True,  # login_state
+                    user_info,  # user_state
+                    user_display,  # user_info_display
+                    message,  # login_message
+                    "",  # clear employee_id
+                    "",  # clear password
+                    gr.update(visible=False),  # login_btn
+                    gr.update(visible=True),   # logout_btn
+                    "例如：显示最近一周的销售数据"  # update placeholder
+                )
+            else:
+                return (
+                    False,  # login_state
+                    {},  # user_state
+                    "",  # user_info_display
+                    message,  # login_message
+                    employee_id,  # keep employee_id
+                    "",  # clear password
+                    gr.update(visible=True),   # login_btn
+                    gr.update(visible=False),  # logout_btn
+                    "例如：显示最近一周的销售数据（请先登录）"  # keep placeholder
+                )
+        
+        def handle_logout():
+            """处理登出"""
+            success, message = app.logout_user()
+            
+            return (
+                False,  # login_state
+                {},  # user_state
+                "",  # user_info_display
+                message,  # login_message
+                "",  # clear employee_id
+                "",  # clear password
+                gr.update(visible=True),   # login_btn
+                gr.update(visible=False),  # logout_btn
+                "例如：显示最近一周的销售数据（请先登录）",  # update placeholder
+                []  # clear chatbot
+            )
+        
+        def handle_register(employee_id, password, confirm_password, email, full_name):
+            """处理注册"""
+            success, message = app.register_user(
+                employee_id, password, confirm_password, email, full_name
+            )
+            
+            if success:
+                return message, "", "", "", "", ""  # clear all fields
+            else:
+                return message, employee_id, "", "", email, full_name  # keep non-password fields
+        
+        def handle_chat(message, history, auto_viz, enable_analysis, analysis_level):
+            """处理聊天查询"""
+            if not app.is_authenticated():
+                history.append([message, "❌ 请先登录后再进行查询"])
+                return history, "", None
+            
+            # 使用生成器处理流式响应
+            for result in app.chat_query(message, history, auto_viz, enable_analysis, analysis_level):
+                yield result
+        
+        def handle_feedback(description):
+            """处理反馈"""
+            result = app.add_positive_feedback(description)
+            return result, ""  # clear description
+        
+        def handle_test_connection():
+            """处理数据库连接测试"""
+            status, info = app.test_connection()
+            return f"{status}\n\n{info}"
+        
+        def handle_refresh_schema():
+            """处理Schema刷新"""
+            status, info = app.refresh_schema()
+            return f"{status}\n\n{info}"
+        
+        def handle_get_schema():
+            """处理获取Schema信息"""
+            status, info = app.get_schema_info()
+            return f"{status}\n\n{info}"
+        
+        def handle_knowledge_stats():
+            """处理获取知识库统计"""
+            return app.get_knowledge_stats()
+        
+        # 绑定事件
+        login_btn.click(
+            handle_login,
+            inputs=[login_employee_id, login_password],
+            outputs=[
+                login_state, user_state, user_info_display,
+                login_message, login_employee_id, login_password,
+                login_btn, logout_btn, msg_input
+            ]
+        )
+        
+        logout_btn.click(
+            handle_logout,
+            outputs=[
+                login_state, user_state, user_info_display,
+                login_message, login_employee_id, login_password,
+                login_btn, logout_btn, msg_input, chatbot
+            ]
+        )
+        
+        register_btn.click(
+            handle_register,
+            inputs=[reg_employee_id, reg_password, reg_confirm_password, reg_email, reg_full_name],
+            outputs=[register_message, reg_employee_id, reg_password, reg_confirm_password, reg_email, reg_full_name]
+        )
+        
+        # 聊天事件
+        send_btn.click(
+            handle_chat,
+            inputs=[msg_input, chatbot, auto_viz_checkbox, enable_analysis_checkbox, analysis_level_dropdown],
+            outputs=[chatbot, msg_input, plot_output]
+        )
+        
+        msg_input.submit(
+            handle_chat,
+            inputs=[msg_input, chatbot, auto_viz_checkbox, enable_analysis_checkbox, analysis_level_dropdown],
+            outputs=[chatbot, msg_input, plot_output]
+        )
+        
+        # 反馈事件
+        like_btn.click(
+            handle_feedback,
+            inputs=[feedback_description],
+            outputs=[feedback_output, feedback_description]
+        )
+        
+        # 系统信息事件
+        test_conn_btn.click(
+            handle_test_connection,
+            outputs=[system_status]
+        )
+        
+        refresh_schema_btn.click(
+            handle_refresh_schema,
+            outputs=[system_status]
+        )
+        
+        get_schema_btn.click(
+            handle_get_schema,
+            outputs=[system_status]
+        )
+        
+        knowledge_stats_btn.click(
+            handle_knowledge_stats,
+            outputs=[knowledge_stats_output]
+        )
+        
+        # 知识库管理功能事件绑定
+        refresh_stats_btn.click(
+            fn=app.get_knowledge_stats,
+            outputs=[knowledge_stats]
+        )
+        
+        # 知识库导入导出功能
+        export_kb_btn.click(
+            fn=app.export_knowledge_base,
+            outputs=[export_kb_status, export_kb_data]
+        )
+        
+        import_kb_btn.click(
+            fn=app.import_knowledge_base,
+            inputs=[import_kb_data],
+            outputs=[import_kb_status]
+        ).then(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
+        ).then(
+            fn=lambda: "",
+            outputs=[import_kb_data]
+        )
+        
+        # 知识库表格管理功能
+        refresh_table_btn.click(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
+        )
+        
+        # 表格行选择事件
+        def on_table_select(evt: gr.SelectData):
+            if evt.index is not None and evt.index[0] is not None:
+                # 获取选中行的数据
+                df = app.get_knowledge_table()
+                if not df.empty and evt.index[0] < len(df):
+                    row = df.iloc[evt.index[0]]
+                    return (
+                        row['ID'],
+                        row['问题'],
+                        row['SQL查询'],
+                        row['描述'],
+                        row['标签'],
+                        f"✅ 已选择条目: {row['ID']}"
+                    )
+            return "", "", "", "", "", "❌ 请选择有效的表格行"
+        
+        knowledge_table.select(
+            fn=on_table_select,
+            outputs=[selected_id, edit_question, edit_sql, edit_description, edit_tags, edit_result]
+        )
+        
+        # 更新条目
+        update_btn.click(
+            fn=app.update_knowledge_item,
+            inputs=[selected_id, edit_question, edit_sql, edit_description, edit_tags],
+            outputs=[edit_result]
+        ).then(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
+        )
+        
+        # 删除条目
+        delete_btn.click(
+            fn=app.delete_knowledge_item,
+            inputs=[selected_id],
+            outputs=[edit_result]
+        ).then(
+            fn=app.get_knowledge_table,
+            outputs=[knowledge_table]
+        ).then(
+            fn=lambda: ("", "", "", "", ""),
+            outputs=[selected_id, edit_question, edit_sql, edit_description, edit_tags]
+        )
+        
+        # 添加新条目
+        add_btn.click(
+            fn=app.add_knowledge_item,
+            inputs=[new_question, new_sql, new_description, new_tags],
+            outputs=[add_result]
+        ).then(
+            fn=lambda: ("", "", "", ""),
+            outputs=[new_question, new_sql, new_description, new_tags]
+        )
+        
+        # 快速添加按钮 - 清空编辑表单
+        add_new_btn.click(
+            fn=lambda: ("", "", "", "", ""),
+            outputs=[selected_id, edit_question, edit_sql, edit_description, edit_tags]
+        )
+        
+        # 表信息维护功能事件绑定
+        
+        # 表信息管理
+        load_table_btn.click(
+            fn=app.get_table_metadata_info,
+            inputs=[table_dropdown],
+            outputs=[table_business_name, table_description, table_business_meaning, table_category, table_status]
+        )
+        
+        save_table_btn.click(
+            fn=app.update_table_metadata_info,
+            inputs=[table_dropdown, table_business_name, table_description, table_business_meaning, table_category],
+            outputs=[table_status]
+        )
+        
+        # 字段信息管理 - 表格模式
+        load_columns_btn.click(
+            fn=app.load_table_with_examples,
+            inputs=[column_table_dropdown],
+            outputs=[columns_dataframe, column_status]
+        )
+        
+        refresh_examples_btn.click(
+            fn=app.refresh_data_examples,
+            inputs=[column_table_dropdown],
+            outputs=[columns_dataframe, column_status]
+        )
+        
+        # 当表格数据变化时自动保存
+        columns_dataframe.change(
+            fn=app.update_columns_from_dataframe,
+            inputs=[column_table_dropdown, columns_dataframe],
+            outputs=[column_status]
+        )
+        
+        # 数据导入导出
+        export_btn.click(
+            fn=app.export_table_metadata,
+            outputs=[export_status, export_data]
+        )
+        
+        import_btn.click(
+            fn=app.import_table_metadata,
+            inputs=[import_data],
+            outputs=[import_status]
+        )
+        
+        # 启动时初始化
+        def load_initial_data():
+            """启动时加载初始数据"""
+            try:
+                # 加载知识库统计
+                stats = app.get_knowledge_stats()
+                # 加载知识库表格
+                kb_table = app.get_knowledge_table()
+                return stats, kb_table
+            except Exception as e:
+                return f"❌ 初始化失败: {str(e)}", pd.DataFrame()
+        
+        demo.load(
+            fn=load_initial_data,
+            outputs=[knowledge_stats, knowledge_table]
+        )
+    
+    return demo
+
 
 def create_chat_interface():
     """创建对话式界面"""

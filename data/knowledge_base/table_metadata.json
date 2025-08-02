@@ -108,5 +108,100 @@
         "data_examples": []
       }
     }
+  },
+  "allowed_employees": {
+    "table_name": "allowed_employees",
+    "business_name": "",
+    "description": "",
+    "business_meaning": "",
+    "category": "",
+    "columns": {
+      "employee_id": {
+        "name": "employee_id",
+        "business_name": "",
+        "description": "None",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "added_by": {
+        "name": "added_by",
+        "business_name": "",
+        "description": "None",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "added_at": {
+        "name": "added_at",
+        "business_name": "",
+        "description": "None",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "description": {
+        "name": "description",
+        "business_name": "",
+        "description": "None",
+        "business_meaning": "",
+        "data_examples": []
+      }
+    }
+  },
+  "dim_edd_city": {
+    "table_name": "dim_edd_city",
+    "business_name": "",
+    "description": "",
+    "business_meaning": "",
+    "category": "",
+    "columns": {
+      "region": {
+        "name": "region",
+        "business_name": "",
+        "description": "业务大区名称",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "province": {
+        "name": "province",
+        "business_name": "",
+        "description": "省份",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "city_known": {
+        "name": "city_known",
+        "business_name": "",
+        "description": "城市名称",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "product_line_mapped": {
+        "name": "product_line_mapped",
+        "business_name": "",
+        "description": "产品线名称",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "material_code": {
+        "name": "material_code",
+        "business_name": "",
+        "description": "物料代码",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "dw_update_date": {
+        "name": "dw_update_date",
+        "business_name": "",
+        "description": "None",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "dw_upload_date": {
+        "name": "dw_upload_date",
+        "business_name": "",
+        "description": "None",
+        "business_meaning": "",
+        "data_examples": []
+      }
+    }
   }
 }

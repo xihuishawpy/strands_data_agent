@@ -1,12 +1,248 @@
 {
-  "all_tables": {
+  "all_tables_global": {
     "data": [
+      "allowed_employees",
+      "audit_logs",
+      "auth_migrations",
       "dim_edd_budget",
       "dim_edd_city",
       "dim_edd_pbidata",
-      "dim_edd_plscxcomparison"
+      "dim_edd_plscxcomparison",
+      "login_attempts",
+      "user_permissions",
+      "user_sessions",
+      "users"
     ],
-    "timestamp": 1753976764.9940748
+    "timestamp": 1754130602.321934
+  },
+  "table_schema_allowed_employees": {
+    "data": {
+      "table_name": "allowed_employees",
+      "columns": [
+        {
+          "name": "employee_id",
+          "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "added_by",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "added_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP",
+          "comment": null
+        },
+        {
+          "name": "description",
+          "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        }
+      ],
+      "primary_keys": [
+        "employee_id"
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "added_by"
+          ],
+          "referred_table": "users",
+          "referred_columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_allowed_employees_added_at",
+          "columns": [
+            "added_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_allowed_employees_added_by",
+          "columns": [
+            "added_by"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "timestamp": 1754130602.342953
+  },
+  "table_schema_audit_logs": {
+    "data": {
+      "table_name": "audit_logs",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "action",
+          "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "resource_type",
+          "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "resource_id",
+          "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "details",
+          "type": "JSON",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "ip_address",
+          "type": "VARCHAR(45) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "user_agent",
+          "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP",
+          "comment": null
+        }
+      ],
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "referred_table": "users",
+          "referred_columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_audit_logs_action",
+          "columns": [
+            "action"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_audit_logs_created_at",
+          "columns": [
+            "created_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_audit_logs_resource_type",
+          "columns": [
+            "resource_type"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_audit_logs_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "timestamp": 1754130602.350234
+  },
+  "table_schema_auth_migrations": {
+    "data": {
+      "table_name": "auth_migrations",
+      "columns": [
+        {
+          "name": "version",
+          "type": "VARCHAR(50)",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(200)",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "applied_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP",
+          "comment": null
+        },
+        {
+          "name": "execution_time_ms",
+          "type": "INTEGER",
+          "nullable": true,
+          "default": "'0'",
+          "comment": null
+        }
+      ],
+      "primary_keys": [
+        "version"
+      ],
+      "foreign_keys": [],
+      "indexes": []
+    },
+    "timestamp": 1754130602.3563678
   },
   "table_schema_dim_edd_budget": {
     "data": {
@@ -101,7 +337,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1753976765.008503
+    "timestamp": 1754130602.362186
   },
   "table_schema_dim_edd_city": {
     "data": {
@@ -161,7 +397,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1753976765.014316
+    "timestamp": 1754130602.367203
   },
   "table_schema_dim_edd_pbidata": {
     "data": {
@@ -270,7 +506,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1753976765.0219562
+    "timestamp": 1754130602.373526
   },
   "table_schema_dim_edd_plscxcomparison": {
     "data": {
@@ -323,12 +559,703 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1753976765.025878
+    "timestamp": 1754130602.3786361
   },
-  "database_schema": {
+  "table_schema_login_attempts": {
+    "data": {
+      "table_name": "login_attempts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "employee_id",
+          "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "ip_address",
+          "type": "VARCHAR(45) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "user_agent",
+          "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "success",
+          "type": "TINYINT",
+          "nullable": true,
+          "default": "'0'",
+          "comment": null
+        },
+        {
+          "name": "failure_reason",
+          "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "attempted_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP",
+          "comment": null
+        }
+      ],
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_login_attempts_attempted_at",
+          "columns": [
+            "attempted_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_login_attempts_employee_id",
+          "columns": [
+            "employee_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_login_attempts_ip_address",
+          "columns": [
+            "ip_address"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_login_attempts_success",
+          "columns": [
+            "success"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "timestamp": 1754130602.385271
+  },
+  "table_schema_user_permissions": {
+    "data": {
+      "table_name": "user_permissions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "schema_name",
+          "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "permission_level",
+          "type": "ENUM",
+          "nullable": true,
+          "default": "'read'",
+          "comment": null
+        },
+        {
+          "name": "granted_by",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "granted_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP",
+          "comment": null
+        },
+        {
+          "name": "expires_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "is_active",
+          "type": "TINYINT",
+          "nullable": true,
+          "default": "'1'",
+          "comment": null
+        }
+      ],
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "referred_table": "users",
+          "referred_columns": [
+            "id"
+          ]
+        },
+        {
+          "columns": [
+            "granted_by"
+          ],
+          "referred_table": "users",
+          "referred_columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "granted_by",
+          "columns": [
+            "granted_by"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_user_permissions_expires_at",
+          "columns": [
+            "expires_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_user_permissions_is_active",
+          "columns": [
+            "is_active"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_user_permissions_schema_name",
+          "columns": [
+            "schema_name"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_user_permissions_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "unique_user_schema",
+          "columns": [
+            "user_id",
+            "schema_name"
+          ],
+          "unique": true
+        }
+      ]
+    },
+    "timestamp": 1754130602.393007
+  },
+  "table_schema_user_sessions": {
+    "data": {
+      "table_name": "user_sessions",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "session_token",
+          "type": "VARCHAR(255) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "ip_address",
+          "type": "VARCHAR(45) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "user_agent",
+          "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP",
+          "comment": null
+        },
+        {
+          "name": "expires_at",
+          "type": "TIMESTAMP",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "last_activity",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+          "comment": null
+        },
+        {
+          "name": "is_active",
+          "type": "TINYINT",
+          "nullable": true,
+          "default": "'1'",
+          "comment": null
+        }
+      ],
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "referred_table": "users",
+          "referred_columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_user_sessions_expires_at",
+          "columns": [
+            "expires_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_user_sessions_is_active",
+          "columns": [
+            "is_active"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_user_sessions_session_token",
+          "columns": [
+            "session_token"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_user_sessions_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "session_token",
+          "columns": [
+            "session_token"
+          ],
+          "unique": true
+        }
+      ]
+    },
+    "timestamp": 1754130602.4013052
+  },
+  "table_schema_users": {
+    "data": {
+      "table_name": "users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "employee_id",
+          "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "password_hash",
+          "type": "VARCHAR(255) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": false,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(255) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "full_name",
+          "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "is_active",
+          "type": "TINYINT",
+          "nullable": true,
+          "default": "'1'",
+          "comment": null
+        },
+        {
+          "name": "is_admin",
+          "type": "TINYINT",
+          "nullable": true,
+          "default": "'0'",
+          "comment": null
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP",
+          "comment": null
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+          "comment": null
+        },
+        {
+          "name": "last_login",
+          "type": "TIMESTAMP",
+          "nullable": true,
+          "default": null,
+          "comment": null
+        },
+        {
+          "name": "login_count",
+          "type": "INTEGER",
+          "nullable": true,
+          "default": "'0'",
+          "comment": null
+        }
+      ],
+      "primary_keys": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "employee_id",
+          "columns": [
+            "employee_id"
+          ],
+          "unique": true
+        },
+        {
+          "name": "idx_users_created_at",
+          "columns": [
+            "created_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_users_email",
+          "columns": [
+            "email"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_users_employee_id",
+          "columns": [
+            "employee_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "idx_users_is_active",
+          "columns": [
+            "is_active"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    "timestamp": 1754130602.407687
+  },
+  "database_schema_global": {
     "data": {
       "database_type": "mysql",
       "tables": {
+        "allowed_employees": {
+          "table_name": "allowed_employees",
+          "columns": [
+            {
+              "name": "employee_id",
+              "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "added_by",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "added_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP",
+              "comment": null
+            },
+            {
+              "name": "description",
+              "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            }
+          ],
+          "primary_keys": [
+            "employee_id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "added_by"
+              ],
+              "referred_table": "users",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_allowed_employees_added_at",
+              "columns": [
+                "added_at"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_allowed_employees_added_by",
+              "columns": [
+                "added_by"
+              ],
+              "unique": false
+            }
+          ]
+        },
+        "audit_logs": {
+          "table_name": "audit_logs",
+          "columns": [
+            {
+              "name": "id",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "user_id",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "action",
+              "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "resource_type",
+              "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "resource_id",
+              "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "details",
+              "type": "JSON",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "ip_address",
+              "type": "VARCHAR(45) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "user_agent",
+              "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "created_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP",
+              "comment": null
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "user_id"
+              ],
+              "referred_table": "users",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_audit_logs_action",
+              "columns": [
+                "action"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_audit_logs_created_at",
+              "columns": [
+                "created_at"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_audit_logs_resource_type",
+              "columns": [
+                "resource_type"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_audit_logs_user_id",
+              "columns": [
+                "user_id"
+              ],
+              "unique": false
+            }
+          ]
+        },
+        "auth_migrations": {
+          "table_name": "auth_migrations",
+          "columns": [
+            {
+              "name": "version",
+              "type": "VARCHAR(50)",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "name",
+              "type": "VARCHAR(200)",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "description",
+              "type": "TEXT",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "applied_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP",
+              "comment": null
+            },
+            {
+              "name": "execution_time_ms",
+              "type": "INTEGER",
+              "nullable": true,
+              "default": "'0'",
+              "comment": null
+            }
+          ],
+          "primary_keys": [
+            "version"
+          ],
+          "foreign_keys": [],
+          "indexes": []
+        },
         "dim_edd_budget": {
           "table_name": "dim_edd_budget",
           "columns": [
@@ -633,10 +1560,502 @@
           "primary_keys": [],
           "foreign_keys": [],
           "indexes": []
+        },
+        "login_attempts": {
+          "table_name": "login_attempts",
+          "columns": [
+            {
+              "name": "id",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "employee_id",
+              "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "ip_address",
+              "type": "VARCHAR(45) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "user_agent",
+              "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "success",
+              "type": "TINYINT",
+              "nullable": true,
+              "default": "'0'",
+              "comment": null
+            },
+            {
+              "name": "failure_reason",
+              "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "attempted_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP",
+              "comment": null
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "indexes": [
+            {
+              "name": "idx_login_attempts_attempted_at",
+              "columns": [
+                "attempted_at"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_login_attempts_employee_id",
+              "columns": [
+                "employee_id"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_login_attempts_ip_address",
+              "columns": [
+                "ip_address"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_login_attempts_success",
+              "columns": [
+                "success"
+              ],
+              "unique": false
+            }
+          ]
+        },
+        "user_permissions": {
+          "table_name": "user_permissions",
+          "columns": [
+            {
+              "name": "id",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "user_id",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "schema_name",
+              "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "permission_level",
+              "type": "ENUM",
+              "nullable": true,
+              "default": "'read'",
+              "comment": null
+            },
+            {
+              "name": "granted_by",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "granted_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP",
+              "comment": null
+            },
+            {
+              "name": "expires_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "is_active",
+              "type": "TINYINT",
+              "nullable": true,
+              "default": "'1'",
+              "comment": null
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "user_id"
+              ],
+              "referred_table": "users",
+              "referred_columns": [
+                "id"
+              ]
+            },
+            {
+              "columns": [
+                "granted_by"
+              ],
+              "referred_table": "users",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "indexes": [
+            {
+              "name": "granted_by",
+              "columns": [
+                "granted_by"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_user_permissions_expires_at",
+              "columns": [
+                "expires_at"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_user_permissions_is_active",
+              "columns": [
+                "is_active"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_user_permissions_schema_name",
+              "columns": [
+                "schema_name"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_user_permissions_user_id",
+              "columns": [
+                "user_id"
+              ],
+              "unique": false
+            },
+            {
+              "name": "unique_user_schema",
+              "columns": [
+                "user_id",
+                "schema_name"
+              ],
+              "unique": true
+            }
+          ]
+        },
+        "user_sessions": {
+          "table_name": "user_sessions",
+          "columns": [
+            {
+              "name": "id",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "user_id",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "session_token",
+              "type": "VARCHAR(255) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "ip_address",
+              "type": "VARCHAR(45) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "user_agent",
+              "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "created_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP",
+              "comment": null
+            },
+            {
+              "name": "expires_at",
+              "type": "TIMESTAMP",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "last_activity",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+              "comment": null
+            },
+            {
+              "name": "is_active",
+              "type": "TINYINT",
+              "nullable": true,
+              "default": "'1'",
+              "comment": null
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [
+            {
+              "columns": [
+                "user_id"
+              ],
+              "referred_table": "users",
+              "referred_columns": [
+                "id"
+              ]
+            }
+          ],
+          "indexes": [
+            {
+              "name": "idx_user_sessions_expires_at",
+              "columns": [
+                "expires_at"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_user_sessions_is_active",
+              "columns": [
+                "is_active"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_user_sessions_session_token",
+              "columns": [
+                "session_token"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_user_sessions_user_id",
+              "columns": [
+                "user_id"
+              ],
+              "unique": false
+            },
+            {
+              "name": "session_token",
+              "columns": [
+                "session_token"
+              ],
+              "unique": true
+            }
+          ]
+        },
+        "users": {
+          "table_name": "users",
+          "columns": [
+            {
+              "name": "id",
+              "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "employee_id",
+              "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "password_hash",
+              "type": "VARCHAR(255) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": false,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "email",
+              "type": "VARCHAR(255) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "full_name",
+              "type": "VARCHAR(100) COLLATE \"utf8mb4_unicode_ci\"",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "is_active",
+              "type": "TINYINT",
+              "nullable": true,
+              "default": "'1'",
+              "comment": null
+            },
+            {
+              "name": "is_admin",
+              "type": "TINYINT",
+              "nullable": true,
+              "default": "'0'",
+              "comment": null
+            },
+            {
+              "name": "created_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP",
+              "comment": null
+            },
+            {
+              "name": "updated_at",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+              "comment": null
+            },
+            {
+              "name": "last_login",
+              "type": "TIMESTAMP",
+              "nullable": true,
+              "default": null,
+              "comment": null
+            },
+            {
+              "name": "login_count",
+              "type": "INTEGER",
+              "nullable": true,
+              "default": "'0'",
+              "comment": null
+            }
+          ],
+          "primary_keys": [
+            "id"
+          ],
+          "foreign_keys": [],
+          "indexes": [
+            {
+              "name": "employee_id",
+              "columns": [
+                "employee_id"
+              ],
+              "unique": true
+            },
+            {
+              "name": "idx_users_created_at",
+              "columns": [
+                "created_at"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_users_email",
+              "columns": [
+                "email"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_users_employee_id",
+              "columns": [
+                "employee_id"
+              ],
+              "unique": false
+            },
+            {
+              "name": "idx_users_is_active",
+              "columns": [
+                "is_active"
+              ],
+              "unique": false
+            }
+          ]
         }
       },
-      "relationships": []
+      "relationships": [
+        {
+          "from_table": "allowed_employees",
+          "from_column": "added_by",
+          "to_table": "users",
+          "to_column": "id"
+        },
+        {
+          "from_table": "audit_logs",
+          "from_column": "user_id",
+          "to_table": "users",
+          "to_column": "id"
+        },
+        {
+          "from_table": "user_permissions",
+          "from_column": "user_id",
+          "to_table": "users",
+          "to_column": "id"
+        },
+        {
+          "from_table": "user_permissions",
+          "from_column": "granted_by",
+          "to_table": "users",
+          "to_column": "id"
+        },
+        {
+          "from_table": "user_sessions",
+          "from_column": "user_id",
+          "to_table": "users",
+          "to_column": "id"
+        }
+      ],
+      "user_id": null,
+      "permission_filtered": false
     },
-    "timestamp": 1753976765.0270588
+    "timestamp": 1754130602.409507
   }
 }

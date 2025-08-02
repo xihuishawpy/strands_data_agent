@@ -257,7 +257,10 @@ class PermissionManager:
             List[UserPermission]: 用户权限列表
         """
         try:
-            return self.database.get_user_permissions(user_id)
+            self.logger.info(f"获取用户权限: {user_id}")
+            permissions = self.database.get_user_permissions(user_id)
+            self.logger.info(f"从数据库获取到 {len(permissions)} 条权限记录")
+            return permissions
         except Exception as e:
             self.logger.error(f"获取用户权限异常: {user_id} - {str(e)}")
             return []

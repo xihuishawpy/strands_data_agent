@@ -91,6 +91,7 @@ class DatabasePermissionFilter:
         """
         try:
             self.logger.info(f"开始过滤用户schema权限: {user_id}")
+            self.logger.info(f"可用的schema列表: {available_schemas}")
             
             # 1. 获取用户信息
             user = self.auth_database.get_user_by_id(user_id)
@@ -119,9 +120,16 @@ class DatabasePermissionFilter:
             
             # 3.3 检查用户特定权限
             user_permissions = self.permission_manager.get_user_permissions(user_id)
+            self.logger.info(f"获取到用户权限数量: {len(user_permissions)}")
+            
             for permission in user_permissions:
+                self.logger.info(f"检查权限: schema={permission.schema_name}, valid={permission.is_valid()}, active={permission.is_active}")
+                self.logger.info(f"schema '{permission.schema_name}' 是否在可用列表中: {permission.schema_name in available_schemas}")
                 if permission.is_valid() and permission.schema_name in available_schemas:
                     accessible_schemas.add(permission.schema_name)
+                    self.logger.info(f"添加可访问schema: {permission.schema_name}")
+                elif permission.is_valid():
+                    self.logger.warning(f"权限有效但schema不在可用列表中: {permission.schema_name}")
             
             # 3.4 添加默认schema权限
             for schema in self.permission_config.default_schema_access:
@@ -190,8 +198,8 @@ class DatabasePermissionFilter:
                         errors=["system_table_access_denied"]
                     )
             
-            # 6. 确定所需权限级别
-            actual_required_level = self._determine_required_permission_level(sql_query, required_level)
+            # 6. 确定所需权限级别（默认为读权限）
+            actual_required_level = self._determine_required_permission_level(sql_query, "read")
             
             # 7. 验证每个schema的权限
             allowed_schemas = []
@@ -333,11 +341,44 @@ class UserSpecificDatabaseConnector:
         self.user_id = user_id
         self.logger = logging.getLogger(__name__)
     
+    def connect(self) -> bool:
+        """连接数据库（委托给基础连接器）"""
+        try:
+            if hasattr(self.base_connector, 'connect'):
+                return self.base_connector.connect()
+            else:
+                # 如果基础连接器没有connect方法，假设已连接
+                return True
+        except Exception as e:
+            self.logger.error(f"用户特定数据库连接器连接失败: {self.user_id} - {str(e)}")
+            return False
+    
+    @property
+    def is_connected(self) -> bool:
+        """检查数据库连接状态（委托给基础连接器）"""
+        try:
+            if hasattr(self.base_connector, 'is_connected'):
+                return self.base_connector.is_connected
+            else:
+                # 如果基础连接器没有is_connected属性，假设已连接
+                return True
+        except Exception as e:
+            self.logger.error(f"检查用户特定数据库连接状态失败: {self.user_id} - {str(e)}")
+            return False
+    
     def get_schemas(self) -> List[str]:
         """获取用户可访问的schema列表"""
         try:
             # 1. 获取所有schema
-            all_schemas = self.base_connector.get_schemas() if hasattr(self.base_connector, 'get_schemas') else []
+            if hasattr(self.base_connector, 'get_schemas'):
+                all_schemas = self.base_connector.get_schemas()
+            else:
+                # 如果基础连接器没有get_schemas方法，使用默认的schema列表
+                # 这里包含常见的MySQL schema
+                all_schemas = ['root', 'information_schema', 'mysql', 'performance_schema', 'sys']
+                self.logger.info(f"基础连接器没有get_schemas方法，使用默认schema列表: {all_schemas}")
+            
+            self.logger.info(f"获取到的所有schema: {all_schemas}")
             
             # 2. 根据权限过滤schema
             return self.permission_filter.filter_schemas(self.user_id, all_schemas)
@@ -346,12 +387,13 @@ class UserSpecificDatabaseConnector:
             self.logger.error(f"获取用户可访问schema异常: {self.user_id} - {str(e)}")
             return []
     
-    def execute_query(self, sql_query: str) -> Any:
+    def execute_query(self, query: str, params: Dict[str, Any] = None) -> Any:
         """
         执行查询（带权限检查）
         
         Args:
-            sql_query: SQL查询语句
+            query: SQL查询语句
+            params: 查询参数（可选）
             
         Returns:
             查询结果
@@ -359,7 +401,7 @@ class UserSpecificDatabaseConnector:
         try:
             # 1. 权限验证
             validation_result = self.permission_filter.validate_sql_permissions(
-                self.user_id, sql_query
+                self.user_id, query
             )
             
             if not validation_result.valid:
@@ -368,7 +410,7 @@ class UserSpecificDatabaseConnector:
             
             # 2. 执行查询
             if hasattr(self.base_connector, 'execute_query'):
-                return self.base_connector.execute_query(sql_query)
+                return self.base_connector.execute_query(query, params)
             else:
                 # 模拟执行查询
                 return [{"result": "query executed"}]
@@ -378,6 +420,56 @@ class UserSpecificDatabaseConnector:
         except Exception as e:
             self.logger.error(f"用户特定查询执行异常: {self.user_id} - {str(e)}")
             raise
+    
+    def get_tables(self) -> List[str]:
+        """获取表列表（委托给基础连接器）"""
+        try:
+            if hasattr(self.base_connector, 'get_tables'):
+                return self.base_connector.get_tables()
+            else:
+                return []
+        except Exception as e:
+            self.logger.error(f"获取表列表异常: {self.user_id} - {str(e)}")
+            return []
+    
+    def get_table_names(self) -> List[str]:
+        """获取表名列表（委托给基础连接器）"""
+        try:
+            if hasattr(self.base_connector, 'get_table_names'):
+                return self.base_connector.get_table_names()
+            elif hasattr(self.base_connector, 'get_tables'):
+                return self.base_connector.get_tables()
+            else:
+                return []
+        except Exception as e:
+            self.logger.error(f"获取表名列表异常: {self.user_id} - {str(e)}")
+            return []
+    
+    def get_table_schema(self, table_name: str) -> Dict[str, Any]:
+        """获取表结构（委托给基础连接器）"""
+        try:
+            if hasattr(self.base_connector, 'get_table_schema'):
+                return self.base_connector.get_table_schema(table_name)
+            else:
+                return {}
+        except Exception as e:
+            self.logger.error(f"获取表结构异常: {self.user_id} - {str(e)}")
+            return {}
+    
+    def disconnect(self):
+        """断开连接（委托给基础连接器）"""
+        try:
+            if hasattr(self.base_connector, 'disconnect'):
+                return self.base_connector.disconnect()
+        except Exception as e:
+            self.logger.error(f"断开连接异常: {self.user_id} - {str(e)}")
+    
+    def __getattr__(self, name):
+        """代理其他方法到基础连接器"""
+        if hasattr(self.base_connector, name):
+            return getattr(self.base_connector, name)
+        else:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
     
     def get_table_info(self, schema_name: str = None) -> Dict[str, Any]:
         """
