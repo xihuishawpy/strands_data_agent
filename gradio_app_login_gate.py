@@ -105,6 +105,7 @@ def create_login_gate_app() -> gr.Blocks:
         padding: 20px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     }
+
     .error-msg {
         color: #d32f2f;
         background: rgba(211, 47, 47, 0.1);
@@ -124,7 +125,7 @@ def create_login_gate_app() -> gr.Blocks:
     """
     
     with gr.Blocks(
-        title="ChatBI 智能数据查询系统",
+        title="ChatBI 智能数据分析Agent",
         theme=gr.themes.Soft(),
         css=custom_css
     ) as demo:
@@ -138,7 +139,7 @@ def create_login_gate_app() -> gr.Blocks:
             with gr.Column(elem_classes=["login-card"]):
                 gr.HTML("""
                 <div class="login-title">🤖 ChatBI</div>
-                <div class="login-subtitle">智能数据查询系统 - 请先登录</div>
+                <div class="login-subtitle">智能数据分析Agent系统 - 请先登录</div>
                 """)
                 
                 with gr.Tabs():
@@ -201,19 +202,18 @@ def create_login_gate_app() -> gr.Blocks:
                     with gr.Row():
                         # 聊天面板
                         with gr.Column(scale=3, elem_classes=["chat-panel"]):
-                            gr.Markdown("## 💬 智能数据查询")
                             
                             # 聊天界面
                             chatbot = gr.Chatbot(
-                                label="ChatBI 对话",
+                                label="ChatBI对话",
                                 height=500,
-                                show_label=False,
+                                show_label=True,
                                 container=True,
                                 bubble_full_width=False
                             )
                             
                             # 输入区域
-                            with gr.Row():
+                            with gr.Row(elem_classes=["input-container"]):
                                 msg_input = gr.Textbox(
                                     label="输入您的问题",
                                     placeholder="例如：显示不同物料的预算金额",
