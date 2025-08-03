@@ -70,16 +70,31 @@ class SchemaManager:
         cache_key = f"all_tables_{self.user_id or 'global'}"
         
         if not force_refresh and self._is_cache_valid(cache_key):
-            return self._schema_cache[cache_key]["data"]
+            cached_data = self._schema_cache[cache_key]["data"]
+            # 如果缓存数据为空，强制刷新
+            if not cached_data:
+                logger.warning(f"缓存数据为空，强制刷新: {cache_key}")
+                force_refresh = True
+            else:
+                return cached_data
         
         try:
+            # 确保数据库连接
+            if not self.connector.is_connected:
+                logger.info("数据库未连接，尝试重新连接...")
+                if not self.connector.connect():
+                    logger.error("数据库连接失败")
+                    return []
+            
             # 获取所有表名
             all_tables = self.connector.get_tables()
+            logger.info(f"从数据库获取到 {len(all_tables)} 个表")
             
             # 如果有用户ID和权限过滤器，进行权限过滤
             if self.user_id and self._permission_filter:
                 filtered_tables = self._filter_tables_by_permission(all_tables)
                 self._update_cache(cache_key, filtered_tables)
+                logger.info(f"权限过滤后剩余 {len(filtered_tables)} 个表")
                 return filtered_tables
             else:
                 self._update_cache(cache_key, all_tables)
@@ -87,6 +102,10 @@ class SchemaManager:
                 
         except Exception as e:
             logger.error(f"获取表名失败: {str(e)}")
+            # 如果有缓存数据，返回缓存数据
+            if cache_key in self._schema_cache:
+                logger.warning("获取表名失败，返回缓存数据")
+                return self._schema_cache[cache_key]["data"]
             return []
     
     def _filter_tables_by_permission(self, tables: List[str]) -> List[str]:
@@ -167,11 +186,18 @@ class SchemaManager:
         cache_key = f"database_schema_{self.user_id or 'global'}"
         
         if not force_refresh and self._is_cache_valid(cache_key):
-            return self._schema_cache[cache_key]["data"]
+            cached_data = self._schema_cache[cache_key]["data"]
+            # 如果缓存的Schema没有表，强制刷新
+            if not cached_data.get("tables"):
+                logger.warning(f"缓存的Schema没有表数据，强制刷新: {cache_key}")
+                force_refresh = True
+            else:
+                return cached_data
         
         try:
             # 获取用户可访问的表名
             tables = self.get_all_tables(force_refresh)
+            logger.info(f"开始构建Schema，包含 {len(tables)} 个表")
             
             # 获取每个表的结构
             schema = {
@@ -183,19 +209,37 @@ class SchemaManager:
             }
             
             for table_name in tables:
-                table_schema = self.get_table_schema(table_name, force_refresh)
-                if table_schema:
-                    schema["tables"][table_name] = table_schema
+                try:
+                    table_schema = self.get_table_schema(table_name, force_refresh)
+                    if table_schema:
+                        schema["tables"][table_name] = table_schema
+                    else:
+                        logger.warning(f"表 {table_name} 的Schema为空")
+                except Exception as e:
+                    logger.error(f"获取表 {table_name} 的Schema失败: {str(e)}")
+                    continue
             
             # 分析表关系（只包含用户可访问的表）
             schema["relationships"] = self._analyze_relationships(schema["tables"])
+            
+            logger.info(f"Schema构建完成，包含 {len(schema['tables'])} 个表，{len(schema['relationships'])} 个关系")
             
             self._update_cache(cache_key, schema)
             return schema
             
         except Exception as e:
             logger.error(f"获取数据库Schema失败: {str(e)}")
-            return {}
+            # 如果有缓存数据，返回缓存数据
+            if cache_key in self._schema_cache:
+                logger.warning("获取Schema失败，返回缓存数据")
+                return self._schema_cache[cache_key]["data"]
+            return {
+                "database_type": config.database.type,
+                "tables": {},
+                "relationships": [],
+                "user_id": self.user_id,
+                "permission_filtered": bool(self.user_id)
+            }
     
     def search_relevant_tables(self, keywords: List[str]) -> List[Dict[str, Any]]:
         """

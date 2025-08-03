@@ -1143,13 +1143,24 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
         """获取所有表名列表"""
         try:
             if not self.schema_manager:
+                print("Schema管理器未初始化")
                 return []
             
-            schema = self.schema_manager.get_database_schema()
-            return list(schema.get("tables", {}).keys())
+            # 首先尝试直接获取表列表
+            tables = self.schema_manager.get_all_tables()
+            
+            # 如果获取不到表，尝试强制刷新
+            if not tables:
+                print("表列表为空，尝试强制刷新...")
+                tables = self.schema_manager.get_all_tables(force_refresh=True)
+            
+            print(f"获取到 {len(tables)} 个表")
+            return tables
             
         except Exception as e:
             print(f"获取表列表失败: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def get_table_columns(self, table_name: str) -> List[str]:
@@ -1633,7 +1644,7 @@ def create_authenticated_chatbi_app() -> gr.Blocks:
                         )
                         enable_analysis_checkbox = gr.Checkbox(
                             label="启用数据分析",
-                            value=True
+                            value=False
                         )
                         analysis_level_dropdown = gr.Dropdown(
                             label="分析级别",

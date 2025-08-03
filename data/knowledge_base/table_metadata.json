@@ -158,40 +158,55 @@
         "business_name": "",
         "description": "业务大区名称",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "华北-京辽",
+          "自动监测北区"
+        ]
       },
       "province": {
         "name": "province",
         "business_name": "",
         "description": "省份",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "吉林",
+          "鲁区"
+        ]
       },
       "city_known": {
         "name": "city_known",
         "business_name": "",
         "description": "城市名称",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "长春",
+          "青岛"
+        ]
       },
       "product_line_mapped": {
         "name": "product_line_mapped",
         "business_name": "",
         "description": "产品线名称",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "环境检测产品线",
+          "环境自动监测产品线"
+        ]
       },
       "material_code": {
         "name": "material_code",
         "business_name": "",
         "description": "物料代码",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "EDD",
+          "EAM"
+        ]
       },
       "dw_update_date": {
         "name": "dw_update_date",
         "business_name": "",
-        "description": "None",
+        "description": "数据更新时间",
         "business_meaning": "",
         "data_examples": []
       },
@@ -200,7 +215,10 @@
         "business_name": "",
         "description": "None",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "2025-01-13 13:07:37.890328",
+          "2025-01-13 13:07:38.594552"
+        ]
       }
     }
   }
