@@ -225,7 +225,7 @@
       "dw_update_date": {
         "name": "dw_update_date",
         "business_name": "",
-        "description": "None",
+        "description": "数据更新时间",
         "business_meaning": "",
         "data_examples": []
       },

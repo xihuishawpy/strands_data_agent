@@ -71,15 +71,19 @@ def create_login_gate_app() -> gr.Blocks:
         font-size: 1.1em;
     }
     .user-header {
-        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-        color: white;
-        padding: 15px 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
+        border: 1px solid #d1d5db;
+        color: #374151;
+        padding: 10px 16px;
+        border-radius: 6px;
+        margin-bottom: 15px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        background: #ffffff;
+        transition: border-color 0.2s ease;
+    }
+    .user-header:hover {
+        border-color: #9ca3af;
     }
     .main-content {
         background: #f8f9fa;
