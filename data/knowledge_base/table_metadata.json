@@ -251,7 +251,7 @@
       "ym": {
         "name": "ym",
         "business_name": "",
-        "description": "财务数据的年月，格式如202505",
+        "description": "财务数据的年月",
         "business_meaning": "",
         "data_examples": [
           "202308",

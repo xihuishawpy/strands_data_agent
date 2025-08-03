@@ -13,7 +13,7 @@
       "user_sessions",
       "users"
     ],
-    "timestamp": 1754207178.980382
+    "timestamp": 1754209229.1412349
   },
   "table_schema_allowed_employees": {
     "data": {
@@ -79,7 +79,7 @@
         }
       ]
     },
-    "timestamp": 1754207178.9959428
+    "timestamp": 1754209229.161153
   },
   "table_schema_audit_logs": {
     "data": {
@@ -194,7 +194,7 @@
         }
       ]
     },
-    "timestamp": 1754207179.007427
+    "timestamp": 1754209229.169972
   },
   "table_schema_auth_migrations": {
     "data": {
@@ -242,7 +242,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754207179.012456
+    "timestamp": 1754209229.175952
   },
   "table_schema_dim_edd_budget": {
     "data": {
@@ -337,7 +337,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754207179.017279
+    "timestamp": 1754209229.181949
   },
   "table_schema_dim_edd_city": {
     "data": {
@@ -397,7 +397,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754207179.023211
+    "timestamp": 1754209229.1874409
   },
   "table_schema_dim_edd_pbidata": {
     "data": {
@@ -408,7 +408,7 @@
           "type": "BIGINT",
           "nullable": true,
           "default": null,
-          "comment": "财务数据的年月，格式如202505"
+          "comment": "财务数据的年月"
         },
         {
           "name": "scx_subject",
@@ -506,7 +506,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754207179.029498
+    "timestamp": 1754209229.1937869
   },
   "table_schema_dim_edd_plscxcomparison": {
     "data": {
@@ -559,7 +559,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754207179.034513
+    "timestamp": 1754209229.199001
   },
   "table_schema_login_attempts": {
     "data": {
@@ -650,7 +650,7 @@
         }
       ]
     },
-    "timestamp": 1754207179.039546
+    "timestamp": 1754209229.2065039
   },
   "table_schema_user_permissions": {
     "data": {
@@ -782,7 +782,7 @@
         }
       ]
     },
-    "timestamp": 1754207179.047035
+    "timestamp": 1754209229.216556
   },
   "table_schema_user_sessions": {
     "data": {
@@ -904,7 +904,7 @@
         }
       ]
     },
-    "timestamp": 1754207179.055438
+    "timestamp": 1754209229.225427
   },
   "table_schema_users": {
     "data": {
@@ -1030,7 +1030,7 @@
         }
       ]
     },
-    "timestamp": 1754207179.060516
+    "timestamp": 1754209229.2323241
   },
   "database_schema_global": {
     "data": {
@@ -1413,7 +1413,7 @@
               "type": "BIGINT",
               "nullable": true,
               "default": null,
-              "comment": "财务数据的年月，格式如202505"
+              "comment": "财务数据的年月"
             },
             {
               "name": "scx_subject",
@@ -2056,6 +2056,6 @@
       "user_id": null,
       "permission_filtered": false
     },
-    "timestamp": 1754207179.062149
+    "timestamp": 1754209229.234977
   }
 }

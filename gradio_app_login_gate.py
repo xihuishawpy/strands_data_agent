@@ -630,7 +630,8 @@ def create_login_gate_app() -> gr.Blocks:
                     "",  # clear password
                     [],  # clear chatbot
                     table_choices_update1,  # update table_dropdown
-                    table_choices_update2   # update column_table_dropdown
+                    table_choices_update2,  # update column_table_dropdown
+                    None  # clear plot_output
                 )
             else:
                 return (
@@ -644,7 +645,8 @@ def create_login_gate_app() -> gr.Blocks:
                     "",  # clear password
                     [],  # clear chatbot
                     gr.update(choices=[]),  # clear table_dropdown
-                    gr.update(choices=[])   # clear column_table_dropdown
+                    gr.update(choices=[]),  # clear column_table_dropdown
+                    None  # clear plot_output
                 )
         
         def handle_logout():
@@ -662,7 +664,8 @@ def create_login_gate_app() -> gr.Blocks:
                 "",  # clear password
                 [],  # clear chatbot
                 gr.update(choices=[]),  # clear table_dropdown
-                gr.update(choices=[])   # clear column_table_dropdown
+                gr.update(choices=[]),  # clear column_table_dropdown
+                None  # clear plot_output
             )
         
         def handle_register(employee_id, password, confirm_password, email, full_name):
@@ -698,8 +701,17 @@ def create_login_gate_app() -> gr.Blocks:
             return result, ""  # clear description
         
         def clear_chat():
-            """清空对话"""
-            return []
+            """清空对话和可视化图表"""
+            # 清空ChatBI应用的聊天历史
+            if hasattr(chatbi_app, 'chat_history'):
+                chatbi_app.chat_history = []
+            
+            # 清空最后查询结果
+            if hasattr(chatbi_app, 'last_query_result'):
+                chatbi_app.last_query_result = None
+            
+            # 返回清空的聊天记录和图表
+            return [], None
         
         # 事件处理函数 - 系统管理功能
         def handle_test_connection():
@@ -878,7 +890,7 @@ def create_login_gate_app() -> gr.Blocks:
             outputs=[
                 is_authenticated, current_user_info, login_gate, main_app,
                 user_info_display, login_status, login_employee_id, login_password, chatbot,
-                table_dropdown, column_table_dropdown
+                table_dropdown, column_table_dropdown, plot_output
             ]
         )
         
@@ -887,7 +899,7 @@ def create_login_gate_app() -> gr.Blocks:
             outputs=[
                 is_authenticated, current_user_info, login_gate, main_app,
                 user_info_display, login_status, login_employee_id, login_password, chatbot,
-                table_dropdown, column_table_dropdown
+                table_dropdown, column_table_dropdown, plot_output
             ]
         )
         
@@ -920,7 +932,7 @@ def create_login_gate_app() -> gr.Blocks:
         # 清空对话事件
         clear_chat_btn.click(
             clear_chat,
-            outputs=[chatbot]
+            outputs=[chatbot, plot_output]
         )
         
         # 系统信息事件
@@ -1129,7 +1141,7 @@ def create_login_gate_app() -> gr.Blocks:
             outputs=[
                 is_authenticated, current_user_info, login_gate, main_app,
                 user_info_display, login_status, login_employee_id, login_password, chatbot,
-                table_dropdown, column_table_dropdown
+                table_dropdown, column_table_dropdown, plot_output
             ]
         )
         
