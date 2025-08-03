@@ -13,7 +13,7 @@
       "user_sessions",
       "users"
     ],
-    "timestamp": 1754192127.023102
+    "timestamp": 1754194202.799304
   },
   "table_schema_allowed_employees": {
     "data": {
@@ -24,28 +24,28 @@
           "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
           "nullable": false,
           "default": null,
-          "comment": null
+          "comment": "None"
         },
         {
           "name": "added_by",
           "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
           "nullable": false,
           "default": null,
-          "comment": null
+          "comment": "None"
         },
         {
           "name": "added_at",
           "type": "TIMESTAMP",
           "nullable": true,
           "default": "CURRENT_TIMESTAMP",
-          "comment": null
+          "comment": "None"
         },
         {
           "name": "description",
           "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
           "nullable": true,
           "default": null,
-          "comment": null
+          "comment": "None"
         }
       ],
       "primary_keys": [
@@ -79,7 +79,7 @@
         }
       ]
     },
-    "timestamp": 1754192127.037951
+    "timestamp": 1754194202.828117
   },
   "table_schema_audit_logs": {
     "data": {
@@ -194,7 +194,7 @@
         }
       ]
     },
-    "timestamp": 1754192127.0440981
+    "timestamp": 1754194202.839852
   },
   "table_schema_auth_migrations": {
     "data": {
@@ -242,7 +242,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754192127.047643
+    "timestamp": 1754194202.847837
   },
   "table_schema_dim_edd_budget": {
     "data": {
@@ -253,7 +253,7 @@
           "type": "BIGINT",
           "nullable": true,
           "default": null,
-          "comment": "预算年月"
+          "comment": "测试描述 - 通过Gradio应用更新"
         },
         {
           "name": "scx_subject",
@@ -323,7 +323,7 @@
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": "None"
+          "comment": "数据更新时间"
         },
         {
           "name": "dw_upload_date",
@@ -337,7 +337,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754192127.05076
+    "timestamp": 1754194202.855036
   },
   "table_schema_dim_edd_city": {
     "data": {
@@ -383,21 +383,21 @@
           "type": "DOUBLE",
           "nullable": true,
           "default": null,
-          "comment": null
+          "comment": "None"
         },
         {
           "name": "dw_upload_date",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": null
+          "comment": "None"
         }
       ],
       "primary_keys": [],
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754192127.053979
+    "timestamp": 1754194202.862017
   },
   "table_schema_dim_edd_pbidata": {
     "data": {
@@ -506,7 +506,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754192127.057187
+    "timestamp": 1754194202.8699148
   },
   "table_schema_dim_edd_plscxcomparison": {
     "data": {
@@ -559,7 +559,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754192127.06131
+    "timestamp": 1754194202.878109
   },
   "table_schema_login_attempts": {
     "data": {
@@ -650,7 +650,7 @@
         }
       ]
     },
-    "timestamp": 1754192127.0647821
+    "timestamp": 1754194202.885901
   },
   "table_schema_user_permissions": {
     "data": {
@@ -782,7 +782,7 @@
         }
       ]
     },
-    "timestamp": 1754192127.069663
+    "timestamp": 1754194202.9011571
   },
   "table_schema_user_sessions": {
     "data": {
@@ -904,7 +904,7 @@
         }
       ]
     },
-    "timestamp": 1754192127.07456
+    "timestamp": 1754194202.915766
   },
   "table_schema_users": {
     "data": {
@@ -1030,7 +1030,7 @@
         }
       ]
     },
-    "timestamp": 1754192127.0787358
+    "timestamp": 1754194202.9245949
   },
   "database_schema_global": {
     "data": {
@@ -1044,28 +1044,28 @@
               "type": "VARCHAR(50) COLLATE \"utf8mb4_unicode_ci\"",
               "nullable": false,
               "default": null,
-              "comment": null
+              "comment": "None"
             },
             {
               "name": "added_by",
               "type": "VARCHAR(36) COLLATE \"utf8mb4_unicode_ci\"",
               "nullable": false,
               "default": null,
-              "comment": null
+              "comment": "None"
             },
             {
               "name": "added_at",
               "type": "TIMESTAMP",
               "nullable": true,
               "default": "CURRENT_TIMESTAMP",
-              "comment": null
+              "comment": "None"
             },
             {
               "name": "description",
               "type": "TEXT COLLATE \"utf8mb4_unicode_ci\"",
               "nullable": true,
               "default": null,
-              "comment": null
+              "comment": "None"
             }
           ],
           "primary_keys": [
@@ -1264,7 +1264,7 @@
               "type": "BIGINT",
               "nullable": true,
               "default": null,
-              "comment": "预算年月"
+              "comment": "测试描述 - 通过Gradio应用更新"
             },
             {
               "name": "scx_subject",
@@ -1334,7 +1334,7 @@
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": "None"
+              "comment": "数据更新时间"
             },
             {
               "name": "dw_upload_date",
@@ -1391,14 +1391,14 @@
               "type": "DOUBLE",
               "nullable": true,
               "default": null,
-              "comment": null
+              "comment": "None"
             },
             {
               "name": "dw_upload_date",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": null
+              "comment": "None"
             }
           ],
           "primary_keys": [],
@@ -2056,6 +2056,6 @@
       "user_id": null,
       "permission_filtered": false
     },
-    "timestamp": 1754192127.080176
+    "timestamp": 1754194202.928061
   }
 }

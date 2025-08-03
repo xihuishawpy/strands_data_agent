@@ -10,7 +10,7 @@ import time
 
 from .config import config
 from .database import get_schema_manager, get_sql_executor
-from .agents import get_sql_generator, get_data_analyst, get_sql_fixer
+from .agents import get_sql_generator, get_data_analyst, get_sql_fixer, get_chart_agent
 from .tools import get_visualizer
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ class ChatBIOrchestrator:
         self.sql_generator = get_sql_generator()
         self.data_analyst = get_data_analyst()
         self.sql_fixer = get_sql_fixer()
+        self.chart_agent = get_chart_agent()
         self.visualizer = get_visualizer()
         
         # 初始化知识库管理器
@@ -103,34 +104,51 @@ class ChatBIOrchestrator:
             sql_query = final_sql or sql_query
             yield {"step_info": f"✅ **步骤3完成**: 查询执行成功，获得 **{sql_result.row_count}** 行数据"}
             
-            # ===== 步骤4: 数据分析 =====
-            analysis = None
+            # ===== 步骤4: 智能可视化分析 =====
+            chart_info = None
             visualization_suggestion = None
             
+            if auto_visualize and sql_result.data:
+                yield {"step_info": "🎨 **步骤4**: 正在进行智能可视化分析..."}
+                
+                # 使用图表智能体独立分析数据并推荐图表
+                visualization_suggestion = self._get_smart_visualization_recommendation(sql_result, question)
+                chart_type = visualization_suggestion.get('chart_type', 'none')
+                
+                if chart_type != 'none':
+                    yield {"step_info": f"✅ **步骤4完成**: 智能推荐使用 **{chart_type}** 图表"}
+                    
+                    # 创建可视化
+                    yield {"step_info": "🎯 **步骤5**: 正在创建数据可视化..."}
+                    chart_info = self._create_chart_from_suggestion(sql_result, visualization_suggestion)
+                    
+                    if chart_info and chart_info.get("success"):
+                        yield {"step_info": "✅ **步骤5完成**: 可视化图表创建成功"}
+                    else:
+                        yield {"step_info": "⚠️ **步骤5**: 可视化创建失败或跳过"}
+                else:
+                    yield {"step_info": "ℹ️ **步骤4完成**: 数据不适合可视化展示"}
+            
+            # ===== 步骤6: 数据分析（可选）=====
+            analysis = None
+            analysis_visualization_suggestion = None
+            
             if analysis_level != "none" and sql_result.data:
-                yield {"step_info": "🔍 **步骤4**: 正在进行智能数据分析..."}
+                yield {"step_info": "🔍 **步骤6**: 正在进行智能数据分析..."}
                 
                 analysis = self._analyze_data(question, sql_query, sql_result, analysis_level)
-                yield {"step_info": "✅ **步骤4完成**: 数据分析完成"}
+                yield {"step_info": "✅ **步骤6完成**: 数据分析完成"}
                 
-                # 获取可视化建议
-                if auto_visualize:
-                    yield {"step_info": "🎨 **步骤5**: 正在生成可视化建议..."}
-                    visualization_suggestion = self._get_visualization_suggestion(sql_result, question)
-                    chart_type = visualization_suggestion.get('chart_type', 'none')
-                    yield {"step_info": f"✅ **步骤5完成**: 建议使用 **{chart_type}** 图表"}
-            
-            # ===== 步骤6: 创建可视化 =====
-            chart_info = None
-            if auto_visualize and sql_result.data and visualization_suggestion:
-                yield {"step_info": "🎯 **步骤6**: 正在创建数据可视化..."}
-                
-                chart_info = self._create_chart_from_suggestion(sql_result, visualization_suggestion)
-                
-                if chart_info and chart_info.get("success"):
-                    yield {"step_info": "✅ **步骤6完成**: 可视化图表创建成功"}
-                else:
-                    yield {"step_info": "⚠️ **步骤6**: 可视化创建失败或跳过"}
+                # 如果用户选择了分析，且还没有可视化，则参考分析agent的建议
+                if auto_visualize and not chart_info and sql_result.data:
+                    yield {"step_info": "🎨 **补充**: 基于分析结果生成可视化建议..."}
+                    analysis_visualization_suggestion = self._get_analysis_based_visualization_suggestion(sql_result, question)
+                    
+                    if analysis_visualization_suggestion and analysis_visualization_suggestion.get('chart_type') != 'none':
+                        chart_info = self._create_chart_from_suggestion(sql_result, analysis_visualization_suggestion)
+                        # 合并两种建议
+                        if not visualization_suggestion:
+                            visualization_suggestion = analysis_visualization_suggestion
             
             execution_time = time.time() - start_time
             yield {"step_info": f"🎉 **查询完成**: 总耗时 {execution_time:.2f}秒"}
@@ -215,31 +233,48 @@ class ChatBIOrchestrator:
             sql_query = final_sql or sql_query
             logger.info(f"✅ SQL执行成功: 获得 {sql_result.row_count} 行数据")
             
-            # ===== 步骤4: 数据分析 =====
-            logger.info("🔍 步骤4: 执行数据分析")
-            analysis = None
+            # ===== 步骤4: 智能可视化分析 =====
+            logger.info("🎨 步骤4: 智能可视化分析")
+            chart_info = None
             visualization_suggestion = None
+            
+            if auto_visualize and sql_result.data:
+                # 使用图表智能体独立分析数据并推荐图表
+                visualization_suggestion = self._get_smart_visualization_recommendation(sql_result, question)
+                chart_type = visualization_suggestion.get('chart_type', 'none')
+                logger.info(f"智能可视化推荐: {chart_type}")
+                
+                if chart_type != 'none':
+                    # 创建可视化
+                    logger.info("🎯 创建数据可视化")
+                    chart_info = self._create_chart_from_suggestion(sql_result, visualization_suggestion)
+                    
+                    if chart_info and chart_info.get("success"):
+                        logger.info("✅ 可视化创建成功")
+                    else:
+                        logger.warning("⚠️ 可视化创建失败或跳过")
+                else:
+                    logger.info("ℹ️ 数据不适合可视化展示")
+            
+            # ===== 步骤5: 数据分析（可选）=====
+            logger.info("🔍 步骤5: 执行数据分析")
+            analysis = None
+            analysis_visualization_suggestion = None
             
             if analysis_level != "none" and sql_result.data:
                 analysis = self._analyze_data(question, sql_query, sql_result, analysis_level)
                 logger.info("✅ 数据分析完成")
                 
-                # 获取可视化建议（作为分析的一部分）
-                if auto_visualize:
-                    logger.info("🎨 获取可视化建议")
-                    visualization_suggestion = self._get_visualization_suggestion(sql_result, question)
-                    logger.info(f"可视化建议: {visualization_suggestion.get('chart_type', 'none')}")
-            
-            # ===== 步骤5: 创建可视化 =====
-            chart_info = None
-            if auto_visualize and sql_result.data and visualization_suggestion:
-                logger.info("🎯 步骤5: 创建数据可视化")
-                chart_info = self._create_chart_from_suggestion(sql_result, visualization_suggestion)
-                
-                if chart_info and chart_info.get("success"):
-                    logger.info("✅ 可视化创建成功")
-                else:
-                    logger.warning("⚠️ 可视化创建失败或跳过")
+                # 如果用户选择了分析，且还没有可视化，则参考分析agent的建议
+                if auto_visualize and not chart_info and sql_result.data:
+                    logger.info("🎨 基于分析结果生成可视化建议")
+                    analysis_visualization_suggestion = self._get_analysis_based_visualization_suggestion(sql_result, question)
+                    
+                    if analysis_visualization_suggestion and analysis_visualization_suggestion.get('chart_type') != 'none':
+                        chart_info = self._create_chart_from_suggestion(sql_result, analysis_visualization_suggestion)
+                        # 合并两种建议
+                        if not visualization_suggestion:
+                            visualization_suggestion = analysis_visualization_suggestion
             
             execution_time = time.time() - start_time
             logger.info(f"🎉 查询流程完成，总耗时: {execution_time:.2f}秒")
@@ -470,8 +505,30 @@ class ChatBIOrchestrator:
         # 没有修复或修复失败，返回原始结果
         return sql_result, sql_query
     
-    def _get_visualization_suggestion(self, sql_result: Any, question: str) -> Dict[str, Any]:
-        """获取可视化建议"""
+    def _get_smart_visualization_recommendation(self, sql_result: Any, question: str) -> Dict[str, Any]:
+        """使用图表智能体获取智能可视化建议"""
+        try:
+            if not sql_result.data:
+                return {"chart_type": "none", "reason": "无数据"}
+            
+            # 使用图表智能体进行智能分析和推荐
+            chart_recommendation = self.chart_agent.analyze_and_recommend_chart(
+                data=sql_result.data,
+                question=question,
+                columns=sql_result.columns
+            )
+            
+            # 添加原始问题作为上下文
+            chart_recommendation["original_question"] = question
+            
+            return chart_recommendation
+            
+        except Exception as e:
+            logger.error(f"智能可视化推荐失败: {str(e)}")
+            return {"chart_type": "none", "reason": f"智能推荐失败: {str(e)}"}
+    
+    def _get_analysis_based_visualization_suggestion(self, sql_result: Any, question: str) -> Dict[str, Any]:
+        """基于数据分析agent获取可视化建议（作为补充）"""
         try:
             if not sql_result.data:
                 return {"chart_type": "none", "reason": "无数据"}
@@ -483,17 +540,23 @@ class ChatBIOrchestrator:
                 "row_count": sql_result.row_count
             }
             
-            # 获取可视化建议
+            # 获取分析agent的可视化建议
             chart_suggestion = self.data_analyst.suggest_visualization(query_result)
             
             # 添加原始问题作为上下文
             chart_suggestion["original_question"] = question
+            chart_suggestion["source"] = "analysis_agent"
             
             return chart_suggestion
             
         except Exception as e:
-            logger.error(f"获取可视化建议失败: {str(e)}")
-            return {"chart_type": "none", "reason": f"建议生成失败: {str(e)}"}
+            logger.error(f"获取分析可视化建议失败: {str(e)}")
+            return {"chart_type": "none", "reason": f"分析建议生成失败: {str(e)}"}
+    
+    def _get_visualization_suggestion(self, sql_result: Any, question: str) -> Dict[str, Any]:
+        """获取可视化建议（保持向后兼容）"""
+        # 默认使用智能可视化推荐
+        return self._get_smart_visualization_recommendation(sql_result, question)
     
     def _create_chart_from_suggestion(self, sql_result: Any, visualization_suggestion: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """根据可视化建议创建图表"""

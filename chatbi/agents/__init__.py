@@ -7,6 +7,7 @@ from .base import BaseAgent
 from .sql_generator import SQLGeneratorAgent, get_sql_generator
 from .data_analyst import DataAnalystAgent, get_data_analyst
 from .sql_fixer import SQLFixerAgent, get_sql_fixer
+from .chart_agent import ChartAgent, get_chart_agent
 
 __all__ = [
     "BaseAgent",
@@ -16,4 +17,6 @@ __all__ = [
     "get_data_analyst",
     "SQLFixerAgent",
     "get_sql_fixer",
+    "ChartAgent",
+    "get_chart_agent",
 ] 
