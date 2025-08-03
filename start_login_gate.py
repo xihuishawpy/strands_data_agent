@@ -51,8 +51,8 @@ def main():
     print("📊 集成所有ChatBI功能模块：")
     print("   - 💬 智能数据查询和分析")
     print("   - 🐬 SQL知识库管理")
-    print("   - 📝 表信息维护")
-    print("   - ℹ️ 系统信息管理")
+    print("   - 📝 表信息维护（支持动态刷新）")
+    print("   - ℹ️ 系统信息管理（详细Schema信息）")
     print("=" * 60)
     print()
     

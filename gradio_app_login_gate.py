@@ -212,7 +212,7 @@ def create_login_gate_app() -> gr.Blocks:
                             with gr.Row():
                                 msg_input = gr.Textbox(
                                     label="输入您的问题",
-                                    placeholder="例如：显示最近一周的销售数据",
+                                    placeholder="例如：显示不同物料的预算金额",
                                     scale=4,
                                     container=False
                                 )
@@ -226,7 +226,7 @@ def create_login_gate_app() -> gr.Blocks:
                                 )
                                 enable_analysis_checkbox = gr.Checkbox(
                                     label="启用数据分析",
-                                    value=True
+                                    value=False
                                 )
                                 analysis_level_dropdown = gr.Dropdown(
                                     label="分析级别",
@@ -422,12 +422,14 @@ def create_login_gate_app() -> gr.Blocks:
                                     gr.Markdown("### 选择表")
                                     table_dropdown = gr.Dropdown(
                                         label="选择表",
-                                        choices=chatbi_app.get_table_list(),
+                                        choices=[],  # 初始为空，登录后动态加载
                                         interactive=True,
                                         allow_custom_value=False
                                     )
                                     
-                                    load_table_btn = gr.Button("加载表信息", variant="primary")
+                                    with gr.Row():
+                                        load_table_btn = gr.Button("加载表信息", variant="primary", size="sm")
+                                        refresh_table_list_btn = gr.Button("🔄 刷新表列表", variant="secondary", size="sm")
                                     table_status = gr.Textbox(label="状态", interactive=False)
                                 
                                 with gr.Column(scale=2):
@@ -467,7 +469,7 @@ def create_login_gate_app() -> gr.Blocks:
                                     
                                     column_table_dropdown = gr.Dropdown(
                                         label="选择表",
-                                        choices=chatbi_app.get_table_list(),
+                                        choices=[],  # 初始为空，登录后动态加载
                                         interactive=True,
                                         allow_custom_value=False
                                     )
@@ -475,6 +477,8 @@ def create_login_gate_app() -> gr.Blocks:
                                     with gr.Row():
                                         load_columns_btn = gr.Button("📋 加载字段", variant="primary", size="sm")
                                         refresh_examples_btn = gr.Button("🔄 刷新示例", variant="secondary", size="sm")
+                                    with gr.Row():
+                                        refresh_column_table_list_btn = gr.Button("🔄 刷新表列表", variant="secondary", size="sm")
                                     
                                     column_status = gr.Textbox(label="操作状态", interactive=False, lines=3)
                                     
@@ -581,6 +585,18 @@ def create_login_gate_app() -> gr.Blocks:
         
         
         # 事件处理函数
+        def update_table_choices():
+            """更新表选择下拉框的选项"""
+            try:
+                if chatbi_app.is_authenticated():
+                    tables = chatbi_app.get_table_list()
+                    return gr.update(choices=tables), gr.update(choices=tables)
+                else:
+                    return gr.update(choices=[]), gr.update(choices=[])
+            except Exception as e:
+                print(f"更新表列表失败: {e}")
+                return gr.update(choices=[]), gr.update(choices=[])
+        
         def handle_login(employee_id, password):
             """处理登录"""
             success, message, user_data = chatbi_app.login_user(employee_id, password)
@@ -600,6 +616,9 @@ def create_login_gate_app() -> gr.Blocks:
                 </div>
                 """
                 
+                # 获取更新后的表列表
+                table_choices_update1, table_choices_update2 = update_table_choices()
+                
                 return (
                     True,  # is_authenticated
                     user_data,  # current_user_info
@@ -609,7 +628,9 @@ def create_login_gate_app() -> gr.Blocks:
                     f'<div class="success-msg">✅ {message}</div>',  # login_status
                     "",  # clear employee_id
                     "",  # clear password
-                    []   # clear chatbot
+                    [],  # clear chatbot
+                    table_choices_update1,  # update table_dropdown
+                    table_choices_update2   # update column_table_dropdown
                 )
             else:
                 return (
@@ -621,7 +642,9 @@ def create_login_gate_app() -> gr.Blocks:
                     f'<div class="error-msg">❌ {message}</div>',  # login_status
                     employee_id,  # keep employee_id
                     "",  # clear password
-                    []   # clear chatbot
+                    [],  # clear chatbot
+                    gr.update(choices=[]),  # clear table_dropdown
+                    gr.update(choices=[])   # clear column_table_dropdown
                 )
         
         def handle_logout():
@@ -637,7 +660,9 @@ def create_login_gate_app() -> gr.Blocks:
                 f'<div class="success-msg">✅ {message}</div>' if success else f'<div class="error-msg">❌ {message}</div>',
                 "",  # clear employee_id
                 "",  # clear password
-                []   # clear chatbot
+                [],  # clear chatbot
+                gr.update(choices=[]),  # clear table_dropdown
+                gr.update(choices=[])   # clear column_table_dropdown
             )
         
         def handle_register(employee_id, password, confirm_password, email, full_name):
@@ -684,17 +709,167 @@ def create_login_gate_app() -> gr.Blocks:
         
         def handle_refresh_schema():
             """处理Schema刷新"""
-            status, info = chatbi_app.refresh_schema()
-            return f"{status}\n\n{info}"
+            try:
+                if not chatbi_app.is_authenticated():
+                    return "⚠️ 请先登录后再刷新Schema"
+                
+                # 刷新Schema缓存
+                status, info = chatbi_app.refresh_schema()
+                
+                # 如果刷新成功，获取最新的详细信息
+                if "成功" in status:
+                    detailed_info = get_detailed_schema_info(chatbi_app)
+                    return f"{status}\n\n{detailed_info}"
+                else:
+                    return f"{status}\n\n{info}"
+                    
+            except Exception as e:
+                return f"❌ Schema刷新失败: {str(e)}"
         
         def handle_get_schema():
             """处理获取Schema信息"""
-            status, info = chatbi_app.get_schema_info()
-            return f"{status}\n\n{info}"
+            try:
+                if not chatbi_app.is_authenticated():
+                    return "⚠️ 请先登录以查看Schema信息"
+                
+                # 获取详细的Schema信息
+                schema_info = get_detailed_schema_info(chatbi_app)
+                return schema_info
+            except Exception as e:
+                return f"❌ 获取Schema信息失败: {str(e)}"
         
         def handle_knowledge_stats():
             """处理获取知识库统计"""
             return chatbi_app.get_knowledge_stats()
+        
+        def get_detailed_schema_info(app):
+            """获取详细的Schema信息"""
+            try:
+                info_parts = []
+                
+                # 用户信息
+                if app.current_user:
+                    info_parts.append(f"### 📊 数据库Schema信息")
+                    info_parts.append(f"**当前用户**: {app.current_user.employee_id}")
+                    info_parts.append(f"**权限级别**: {'管理员' if app.current_user.is_admin else '普通用户'}")
+                    info_parts.append("")
+                
+                # 数据库连接信息
+                if app.connector:
+                    try:
+                        from chatbi.config import config
+                        info_parts.append("### 🔗 数据库连接信息")
+                        info_parts.append(f"**数据库类型**: {config.database.type}")
+                        info_parts.append(f"**主机地址**: {config.database.host}:{config.database.port}")
+                        info_parts.append(f"**数据库名**: {config.database.database}")
+                        info_parts.append(f"**连接状态**: {'✅ 已连接' if app.connector.is_connected else '❌ 未连接'}")
+                        info_parts.append("")
+                    except Exception as e:
+                        info_parts.append(f"**连接信息获取失败**: {str(e)}")
+                        info_parts.append("")
+                
+                # 获取表列表
+                if app.schema_manager:
+                    try:
+                        tables = app.get_table_list()
+                        info_parts.append("### 📋 数据库表信息")
+                        info_parts.append(f"**表总数**: {len(tables)}")
+                        
+                        if tables:
+                            info_parts.append("")
+                            info_parts.append("**表列表**:")
+                            
+                            # 按字母顺序排序表名
+                            sorted_tables = sorted(tables)
+                            
+                            # 分组显示表名（每行5个）
+                            for i in range(0, len(sorted_tables), 5):
+                                table_group = sorted_tables[i:i+5]
+                                info_parts.append("  " + " | ".join(f"`{table}`" for table in table_group))
+                            
+                            info_parts.append("")
+                            
+                            # 显示前几个表的详细信息
+                            info_parts.append("**表结构示例** (前3个表):")
+                            for table_name in sorted_tables[:3]:
+                                try:
+                                    table_schema = app.schema_manager.get_table_schema(table_name)
+                                    columns = table_schema.get("columns", [])
+                                    
+                                    info_parts.append(f"\n📊 **{table_name}** ({len(columns)} 个字段)")
+                                    
+                                    # 显示前5个字段
+                                    for col in columns[:5]:
+                                        col_name = col.get("name", "")
+                                        col_type = col.get("type", "")
+                                        col_comment = col.get("comment", "")
+                                        
+                                        col_info = f"  - `{col_name}` ({col_type})"
+                                        if col_comment:
+                                            col_info += f" - {col_comment}"
+                                        info_parts.append(col_info)
+                                    
+                                    if len(columns) > 5:
+                                        info_parts.append(f"  - ... 还有 {len(columns) - 5} 个字段")
+                                
+                                except Exception as e:
+                                    info_parts.append(f"  获取表 {table_name} 结构失败: {str(e)}")
+                        else:
+                            info_parts.append("⚠️ 未找到任何表")
+                        
+                        info_parts.append("")
+                    except Exception as e:
+                        info_parts.append(f"**表信息获取失败**: {str(e)}")
+                        info_parts.append("")
+                
+                # 元数据统计
+                if app.metadata_manager:
+                    try:
+                        # 获取有元数据的表数量
+                        tables_with_metadata = 0
+                        total_columns_with_metadata = 0
+                        
+                        for table_name in app.get_table_list():
+                            metadata = app.metadata_manager.get_table_metadata(table_name)
+                            if metadata:
+                                tables_with_metadata += 1
+                                total_columns_with_metadata += len(metadata.columns)
+                        
+                        info_parts.append("### 📝 元数据统计")
+                        info_parts.append(f"**有元数据的表**: {tables_with_metadata}")
+                        info_parts.append(f"**有元数据的字段**: {total_columns_with_metadata}")
+                        info_parts.append("")
+                    except Exception as e:
+                        info_parts.append(f"**元数据统计失败**: {str(e)}")
+                        info_parts.append("")
+                
+                # 权限信息
+                if app.is_authenticated() and hasattr(app, 'last_query_result') and app.last_query_result:
+                    accessible_schemas = getattr(app.last_query_result, 'accessible_schemas', [])
+                    if accessible_schemas:
+                        info_parts.append("### 🔐 用户权限信息")
+                        info_parts.append(f"**可访问的Schema**: {', '.join(accessible_schemas)}")
+                        info_parts.append("")
+                
+                # 系统状态
+                info_parts.append("### ⚙️ 系统状态")
+                info_parts.append(f"**认证状态**: {'✅ 已认证' if app.is_authenticated() else '❌ 未认证'}")
+                info_parts.append(f"**基础编排器**: {'✅ 已初始化' if app.base_orchestrator else '❌ 未初始化'}")
+                info_parts.append(f"**认证编排器**: {'✅ 已初始化' if app.authenticated_orchestrator else '❌ 未初始化'}")
+                info_parts.append(f"**Schema管理器**: {'✅ 已初始化' if app.schema_manager else '❌ 未初始化'}")
+                info_parts.append(f"**元数据管理器**: {'✅ 已初始化' if app.metadata_manager else '❌ 未初始化'}")
+                
+                # 操作建议
+                info_parts.append("")
+                info_parts.append("### 💡 操作建议")
+                info_parts.append("- 如需刷新Schema信息，请点击'刷新Schema缓存'按钮")
+                info_parts.append("- 可在'表信息维护'标签页中管理表和字段的业务信息")
+                info_parts.append("- 建议定期维护表和字段的元数据以提高查询准确性")
+                
+                return "\n".join(info_parts)
+                
+            except Exception as e:
+                return f"❌ 获取详细Schema信息失败: {str(e)}\n\n详细错误:\n```\n{traceback.format_exc()}\n```"
         
         # 绑定事件
         login_btn.click(
@@ -702,7 +877,8 @@ def create_login_gate_app() -> gr.Blocks:
             inputs=[login_employee_id, login_password],
             outputs=[
                 is_authenticated, current_user_info, login_gate, main_app,
-                user_info_display, login_status, login_employee_id, login_password, chatbot
+                user_info_display, login_status, login_employee_id, login_password, chatbot,
+                table_dropdown, column_table_dropdown
             ]
         )
         
@@ -710,7 +886,8 @@ def create_login_gate_app() -> gr.Blocks:
             handle_logout,
             outputs=[
                 is_authenticated, current_user_info, login_gate, main_app,
-                user_info_display, login_status, login_employee_id, login_password, chatbot
+                user_info_display, login_status, login_employee_id, login_password, chatbot,
+                table_dropdown, column_table_dropdown
             ]
         )
         
@@ -860,6 +1037,35 @@ def create_login_gate_app() -> gr.Blocks:
         
         # 表信息维护功能事件绑定
         
+        # 刷新表列表功能
+        def refresh_table_list():
+            """刷新表列表"""
+            try:
+                if chatbi_app.is_authenticated():
+                    # 强制刷新schema缓存
+                    chatbi_app.refresh_schema()
+                    # 获取最新的表列表
+                    tables = chatbi_app.get_table_list()
+                    return gr.update(choices=tables), "✅ 表列表已刷新"
+                else:
+                    return gr.update(choices=[]), "❌ 请先登录"
+            except Exception as e:
+                return gr.update(choices=[]), f"❌ 刷新失败: {str(e)}"
+        
+        def refresh_column_table_list():
+            """刷新字段管理的表列表"""
+            try:
+                if chatbi_app.is_authenticated():
+                    # 强制刷新schema缓存
+                    chatbi_app.refresh_schema()
+                    # 获取最新的表列表
+                    tables = chatbi_app.get_table_list()
+                    return gr.update(choices=tables), "✅ 表列表已刷新"
+                else:
+                    return gr.update(choices=[]), "❌ 请先登录"
+            except Exception as e:
+                return gr.update(choices=[]), f"❌ 刷新失败: {str(e)}"
+        
         # 表信息管理
         load_table_btn.click(
             fn=chatbi_app.get_table_metadata_info,
@@ -871,6 +1077,17 @@ def create_login_gate_app() -> gr.Blocks:
             fn=chatbi_app.update_table_metadata_info,
             inputs=[table_dropdown, table_business_name, table_description, table_business_meaning, table_category],
             outputs=[table_status]
+        )
+        
+        # 刷新表列表事件
+        refresh_table_list_btn.click(
+            fn=refresh_table_list,
+            outputs=[table_dropdown, table_status]
+        )
+        
+        refresh_column_table_list_btn.click(
+            fn=refresh_column_table_list,
+            outputs=[column_table_dropdown, column_status]
         )
         
         # 字段信息管理 - 表格模式
@@ -911,7 +1128,8 @@ def create_login_gate_app() -> gr.Blocks:
             inputs=[login_employee_id, login_password],
             outputs=[
                 is_authenticated, current_user_info, login_gate, main_app,
-                user_info_display, login_status, login_employee_id, login_password, chatbot
+                user_info_display, login_status, login_employee_id, login_password, chatbot,
+                table_dropdown, column_table_dropdown
             ]
         )
         

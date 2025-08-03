@@ -106,6 +106,15 @@
         "description": "None",
         "business_meaning": "",
         "data_examples": []
+      },
+      "ym": {
+        "name": "ym",
+        "business_name": "",
+        "description": "",
+        "business_meaning": "",
+        "data_examples": [
+          "202301"
+        ]
       }
     }
   },
@@ -228,6 +237,164 @@
         "data_examples": [
           "2025-01-13 13:07:37.890328",
           "2025-01-13 13:07:38.594552"
+        ]
+      }
+    }
+  },
+  "dim_edd_pbidata": {
+    "table_name": "dim_edd_pbidata",
+    "business_name": "",
+    "description": "",
+    "business_meaning": "",
+    "category": "",
+    "columns": {
+      "ym": {
+        "name": "ym",
+        "business_name": "",
+        "description": "财务数据的年月，格式如202505",
+        "business_meaning": "",
+        "data_examples": [
+          "202308",
+          "202303"
+        ]
+      },
+      "scx_subject": {
+        "name": "scx_subject",
+        "business_name": "",
+        "description": "科目名称",
+        "business_meaning": "",
+        "data_examples": [
+          "薪资-奖金-双薪",
+          "折旧费"
+        ]
+      },
+      "material_code": {
+        "name": "material_code",
+        "business_name": "",
+        "description": "物料代码",
+        "business_meaning": "",
+        "data_examples": [
+          "OSD",
+          "HBT"
+        ]
+      },
+      "dept_city": {
+        "name": "dept_city",
+        "business_name": "",
+        "description": "部门所在城市",
+        "business_meaning": "",
+        "data_examples": [
+          "厦门",
+          "西安"
+        ]
+      },
+      "aggregate_city": {
+        "name": "aggregate_city",
+        "business_name": "",
+        "description": "费用归集城市",
+        "business_meaning": "",
+        "data_examples": [
+          "厦门",
+          "西安"
+        ]
+      },
+      "detail_dept": {
+        "name": "detail_dept",
+        "business_name": "",
+        "description": "明细部门",
+        "business_meaning": "",
+        "data_examples": [
+          "职业卫生技术服务中心",
+          "华邦检测实验室-检测部-公卫检测"
+        ]
+      },
+      "data_category": {
+        "name": "data_category",
+        "business_name": "",
+        "description": "None",
+        "business_meaning": "",
+        "data_examples": [
+          "SCX-EAS"
+        ]
+      },
+      "amount": {
+        "name": "amount",
+        "business_name": "",
+        "description": "金额数值，单位为元",
+        "business_meaning": "",
+        "data_examples": [
+          "9220.82",
+          "2660.82"
+        ]
+      },
+      "material_name": {
+        "name": "material_name",
+        "business_name": "",
+        "description": "物料名称",
+        "business_meaning": "",
+        "data_examples": [
+          "职业卫生",
+          "华邦检测"
+        ]
+      },
+      "product_line_code": {
+        "name": "product_line_code",
+        "business_name": "",
+        "description": "产品线代码",
+        "business_meaning": "",
+        "data_examples": [
+          "OSD",
+          "HBT"
+        ]
+      },
+      "product_line_name": {
+        "name": "product_line_name",
+        "business_name": "",
+        "description": "产品线名称",
+        "business_meaning": "",
+        "data_examples": [
+          "职业卫生产品线",
+          "华邦检测"
+        ]
+      },
+      "business_unit_name": {
+        "name": "business_unit_name",
+        "business_name": "",
+        "description": "事业部名称",
+        "business_meaning": "",
+        "data_examples": [
+          "环境事业部"
+        ]
+      },
+      "dw_update_date": {
+        "name": "dw_update_date",
+        "business_name": "",
+        "description": "数据更新时间",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "dw_upload_date": {
+        "name": "dw_upload_date",
+        "business_name": "",
+        "description": "None",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "year_month": {
+        "name": "year_month",
+        "business_name": "",
+        "description": "财务数据的年月，格式如202505",
+        "business_meaning": "",
+        "data_examples": []
+      },
+      "ym1": {
+        "name": "ym1",
+        "business_name": "",
+        "description": "财务数据的年月，格式如202505",
+        "business_meaning": "",
+        "data_examples": [
+          "202308",
+          "202303"
         ]
       }
     }

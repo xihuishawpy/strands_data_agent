@@ -13,7 +13,7 @@
       "user_sessions",
       "users"
     ],
-    "timestamp": 1754196617.2108319
+    "timestamp": 1754206821.905947
   },
   "table_schema_allowed_employees": {
     "data": {
@@ -79,7 +79,7 @@
         }
       ]
     },
-    "timestamp": 1754196617.225373
+    "timestamp": 1754206821.9203541
   },
   "table_schema_audit_logs": {
     "data": {
@@ -194,7 +194,7 @@
         }
       ]
     },
-    "timestamp": 1754196617.229967
+    "timestamp": 1754206821.932213
   },
   "table_schema_auth_migrations": {
     "data": {
@@ -242,14 +242,14 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754196617.2345998
+    "timestamp": 1754206821.9390879
   },
   "table_schema_dim_edd_budget": {
     "data": {
       "table_name": "dim_edd_budget",
       "columns": [
         {
-          "name": "year_month",
+          "name": "ym",
           "type": "BIGINT",
           "nullable": true,
           "default": null,
@@ -337,7 +337,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754196617.237679
+    "timestamp": 1754206821.944876
   },
   "table_schema_dim_edd_city": {
     "data": {
@@ -397,14 +397,14 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754196617.2409532
+    "timestamp": 1754206821.950172
   },
   "table_schema_dim_edd_pbidata": {
     "data": {
       "table_name": "dim_edd_pbidata",
       "columns": [
         {
-          "name": "year_month",
+          "name": "ym",
           "type": "BIGINT",
           "nullable": true,
           "default": null,
@@ -450,14 +450,14 @@
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": null
+          "comment": "None"
         },
         {
           "name": "amount",
           "type": "DOUBLE",
           "nullable": true,
           "default": null,
-          "comment": "金额数值，单位为元\""
+          "comment": "金额数值，单位为元"
         },
         {
           "name": "material_name",
@@ -492,21 +492,21 @@
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": null
+          "comment": "数据更新时间"
         },
         {
           "name": "dw_upload_date",
           "type": "TEXT",
           "nullable": true,
           "default": null,
-          "comment": null
+          "comment": "None"
         }
       ],
       "primary_keys": [],
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754196617.245734
+    "timestamp": 1754206821.956029
   },
   "table_schema_dim_edd_plscxcomparison": {
     "data": {
@@ -559,7 +559,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754196617.250072
+    "timestamp": 1754206821.9612648
   },
   "table_schema_login_attempts": {
     "data": {
@@ -650,7 +650,7 @@
         }
       ]
     },
-    "timestamp": 1754196617.254422
+    "timestamp": 1754206821.966503
   },
   "table_schema_user_permissions": {
     "data": {
@@ -782,7 +782,7 @@
         }
       ]
     },
-    "timestamp": 1754196617.2591271
+    "timestamp": 1754206821.975109
   },
   "table_schema_user_sessions": {
     "data": {
@@ -904,7 +904,7 @@
         }
       ]
     },
-    "timestamp": 1754196617.264392
+    "timestamp": 1754206821.983259
   },
   "table_schema_users": {
     "data": {
@@ -1030,7 +1030,7 @@
         }
       ]
     },
-    "timestamp": 1754196617.267918
+    "timestamp": 1754206821.989766
   },
   "database_schema_global": {
     "data": {
@@ -1260,7 +1260,7 @@
           "table_name": "dim_edd_budget",
           "columns": [
             {
-              "name": "year_month",
+              "name": "ym",
               "type": "BIGINT",
               "nullable": true,
               "default": null,
@@ -1409,7 +1409,7 @@
           "table_name": "dim_edd_pbidata",
           "columns": [
             {
-              "name": "year_month",
+              "name": "ym",
               "type": "BIGINT",
               "nullable": true,
               "default": null,
@@ -1455,14 +1455,14 @@
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": null
+              "comment": "None"
             },
             {
               "name": "amount",
               "type": "DOUBLE",
               "nullable": true,
               "default": null,
-              "comment": "金额数值，单位为元\""
+              "comment": "金额数值，单位为元"
             },
             {
               "name": "material_name",
@@ -1497,14 +1497,14 @@
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": null
+              "comment": "数据更新时间"
             },
             {
               "name": "dw_upload_date",
               "type": "TEXT",
               "nullable": true,
               "default": null,
-              "comment": null
+              "comment": "None"
             }
           ],
           "primary_keys": [],
@@ -2056,6 +2056,6 @@
       "user_id": null,
       "permission_filtered": false
     },
-    "timestamp": 1754196617.269227
+    "timestamp": 1754206821.992579
   }
 }
