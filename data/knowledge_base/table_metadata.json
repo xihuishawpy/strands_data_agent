@@ -9,7 +9,7 @@
       "year_month": {
         "name": "year_month",
         "business_name": "",
-        "description": "测试描述 - 通过Gradio应用更新",
+        "description": "年月",
         "business_meaning": "",
         "data_examples": [
           "202301"

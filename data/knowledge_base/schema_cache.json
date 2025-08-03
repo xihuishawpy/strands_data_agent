@@ -13,7 +13,7 @@
       "user_sessions",
       "users"
     ],
-    "timestamp": 1754194202.799304
+    "timestamp": 1754196617.2108319
   },
   "table_schema_allowed_employees": {
     "data": {
@@ -79,7 +79,7 @@
         }
       ]
     },
-    "timestamp": 1754194202.828117
+    "timestamp": 1754196617.225373
   },
   "table_schema_audit_logs": {
     "data": {
@@ -194,7 +194,7 @@
         }
       ]
     },
-    "timestamp": 1754194202.839852
+    "timestamp": 1754196617.229967
   },
   "table_schema_auth_migrations": {
     "data": {
@@ -242,7 +242,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754194202.847837
+    "timestamp": 1754196617.2345998
   },
   "table_schema_dim_edd_budget": {
     "data": {
@@ -253,7 +253,7 @@
           "type": "BIGINT",
           "nullable": true,
           "default": null,
-          "comment": "测试描述 - 通过Gradio应用更新"
+          "comment": "年月"
         },
         {
           "name": "scx_subject",
@@ -337,7 +337,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754194202.855036
+    "timestamp": 1754196617.237679
   },
   "table_schema_dim_edd_city": {
     "data": {
@@ -397,7 +397,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754194202.862017
+    "timestamp": 1754196617.2409532
   },
   "table_schema_dim_edd_pbidata": {
     "data": {
@@ -506,7 +506,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754194202.8699148
+    "timestamp": 1754196617.245734
   },
   "table_schema_dim_edd_plscxcomparison": {
     "data": {
@@ -559,7 +559,7 @@
       "foreign_keys": [],
       "indexes": []
     },
-    "timestamp": 1754194202.878109
+    "timestamp": 1754196617.250072
   },
   "table_schema_login_attempts": {
     "data": {
@@ -650,7 +650,7 @@
         }
       ]
     },
-    "timestamp": 1754194202.885901
+    "timestamp": 1754196617.254422
   },
   "table_schema_user_permissions": {
     "data": {
@@ -782,7 +782,7 @@
         }
       ]
     },
-    "timestamp": 1754194202.9011571
+    "timestamp": 1754196617.2591271
   },
   "table_schema_user_sessions": {
     "data": {
@@ -904,7 +904,7 @@
         }
       ]
     },
-    "timestamp": 1754194202.915766
+    "timestamp": 1754196617.264392
   },
   "table_schema_users": {
     "data": {
@@ -1030,7 +1030,7 @@
         }
       ]
     },
-    "timestamp": 1754194202.9245949
+    "timestamp": 1754196617.267918
   },
   "database_schema_global": {
     "data": {
@@ -1264,7 +1264,7 @@
               "type": "BIGINT",
               "nullable": true,
               "default": null,
-              "comment": "测试描述 - 通过Gradio应用更新"
+              "comment": "年月"
             },
             {
               "name": "scx_subject",
@@ -2056,6 +2056,6 @@
       "user_id": null,
       "permission_filtered": false
     },
-    "timestamp": 1754194202.928061
+    "timestamp": 1754196617.269227
   }
 }
