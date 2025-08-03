@@ -1435,15 +1435,28 @@ SQL知识库是ChatBI的核心功能之一，通过RAG技术：
                     db_success = True
                     if description and hasattr(self.connector, 'update_column_comment'):
                         try:
-                            db_success = self.connector.update_column_comment(
-                                table_name=table_name,
-                                column_name=col_name,
-                                comment=description
-                            )
-                            if db_success:
-                                db_update_count += 1
+                            # 确保数据库连接
+                            if not self.connector.is_connected:
+                                print(f"数据库未连接，尝试重新连接...")
+                                if not self.connector.connect():
+                                    print(f"数据库连接失败，跳过字段 {col_name} 的数据库备注更新")
+                                    db_success = False
+                                else:
+                                    print(f"数据库重新连接成功")
+                            
+                            if db_success:  # 只有连接成功才尝试更新
+                                db_success = self.connector.update_column_comment(
+                                    table_name=table_name,
+                                    column_name=col_name,
+                                    comment=description
+                                )
+                                if db_success:
+                                    db_update_count += 1
+                                    print(f"成功更新字段 {col_name} 的数据库备注")
+                                else:
+                                    print(f"更新字段 {col_name} 的数据库备注失败")
                         except Exception as e:
-                            print(f"更新数据库字段备注失败 {col_name}: {e}")
+                            print(f"更新数据库字段备注异常 {col_name}: {e}")
                             db_success = False
                     
                     if metadata_success:

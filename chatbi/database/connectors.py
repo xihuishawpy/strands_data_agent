@@ -329,9 +329,12 @@ class MySQLConnector(DatabaseConnector):
     
     def update_column_comment(self, table_name: str, column_name: str, comment: str) -> bool:
         """更新字段备注"""
+        # 确保数据库连接
         if not self.is_connected:
-            logger.error("数据库未连接")
-            return False
+            logger.warning("数据库未连接，尝试重新连接...")
+            if not self.connect():
+                logger.error("数据库连接失败")
+                return False
         
         try:
             # 首先获取字段的当前信息
@@ -373,6 +376,18 @@ class MySQLConnector(DatabaseConnector):
             
         except SQLAlchemyError as e:
             logger.error(f"更新字段备注失败: {str(e)}")
+            # 如果是连接问题，尝试重新连接
+            if "connection" in str(e).lower() or "lost" in str(e).lower():
+                logger.warning("检测到连接问题，尝试重新连接...")
+                if self.connect():
+                    logger.info("重新连接成功，重试更新字段备注...")
+                    try:
+                        with self.engine.begin() as conn:
+                            conn.execute(text(alter_sql))
+                        logger.info(f"重试成功：更新表 {table_name} 字段 {column_name} 的备注")
+                        return True
+                    except SQLAlchemyError as retry_e:
+                        logger.error(f"重试更新字段备注仍然失败: {str(retry_e)}")
             return False
 
 class SQLiteConnector(DatabaseConnector):

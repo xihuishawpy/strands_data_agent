@@ -9,7 +9,7 @@
       "year_month": {
         "name": "year_month",
         "business_name": "",
-        "description": "预算年月",
+        "description": "测试描述 - 通过Gradio应用更新",
         "business_meaning": "",
         "data_examples": [
           "202301"
@@ -96,7 +96,7 @@
       "dw_update_date": {
         "name": "dw_update_date",
         "business_name": "",
-        "description": "None",
+        "description": "数据更新时间",
         "business_meaning": "",
         "data_examples": []
       },
@@ -121,28 +121,38 @@
         "business_name": "",
         "description": "None",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "50992",
+          "admin"
+        ]
       },
       "added_by": {
         "name": "added_by",
         "business_name": "",
         "description": "None",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "4c4518b6-dabc-42e8-85f3-7f4798b1aa7e"
+        ]
       },
       "added_at": {
         "name": "added_at",
         "business_name": "",
         "description": "None",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "2025-08-02 17:53:26"
+        ]
       },
       "description": {
         "name": "description",
         "business_name": "",
         "description": "None",
         "business_meaning": "",
-        "data_examples": []
+        "data_examples": [
+          "系统初始化添加的员工ID: 50992",
+          "系统初始化添加的员工ID: admin"
+        ]
       }
     }
   },
@@ -206,7 +216,7 @@
       "dw_update_date": {
         "name": "dw_update_date",
         "business_name": "",
-        "description": "数据更新时间",
+        "description": "None",
         "business_meaning": "",
         "data_examples": []
       },
